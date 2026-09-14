@@ -109,3 +109,17 @@ input[type=range]::-moz-range-thumb{width:11px;height:11px;background:#a52a3a;bo
   #mobileSaw{right:max(18px,calc(env(safe-area-inset-right) + 8px));bottom:max(98px,calc(env(safe-area-inset-bottom) + 82px))}
   #mobileInteract{right:max(104px,calc(env(safe-area-inset-right) + 88px));bottom:max(24px,calc(env(safe-area-inset-bottom) + 8px))}
 }
+
+/* ---- penumbra: abas do laboratório + montador de salas ---- */
+.tabs{display:flex;gap:8px;justify-content:center;margin:10px 0 16px;flex-wrap:wrap}
+.tabBtn{background:rgba(10,7,8,.6);border:1px solid rgba(230,218,196,.3);color:#9c8f7c;font:600 10px 'IBM Plex Mono',monospace;letter-spacing:.14em;padding:9px 16px;cursor:pointer;transition:all .15s}
+.tabBtn:hover{color:#e6dac4;border-color:rgba(230,218,196,.55)}
+.tabBtn.sel{color:#ffd9a0;border-color:#ffd9a0;background:rgba(165,42,58,.28)}
+.labGrid{display:flex;flex-wrap:wrap;gap:7px;justify-content:center;margin:8px 0 14px}
+.labChip{background:rgba(10,7,8,.72);border:1px solid rgba(230,218,196,.26);color:#c9bfae;font:600 9px 'IBM Plex Mono',monospace;letter-spacing:.1em;padding:8px 11px;cursor:pointer;transition:all .12s}
+.labChip:hover{color:#e6dac4;border-color:rgba(230,218,196,.5)}
+.labChip.sel{color:#0d0a12;background:#ffd9a0;border-color:#ffd9a0}
+.labChip.act{color:#ff9d9d;border-color:rgba(232,69,90,.5)}
+.labChip.act:hover{color:#fff;background:rgba(165,42,58,.4)}
+#labBuild{width:min(92vw,640px);max-height:62vh;overflow-y:auto;padding:4px;margin:0 auto}
+#labRooms .labRoom.cur{border-color:#ffd9a0;box-shadow:0 0 18px rgba(255,217,160,.18)}

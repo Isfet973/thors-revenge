@@ -6,7 +6,7 @@
 <title>Thor's Revenge</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Pirata+One&family=Cinzel:wght@700&family=MedievalSharp&family=Uncial+Antiqua&family=Metal+Mania&family=Nosifer&family=Creepster&family=Eater&family=Rubik+Moonrocks&family=IM+Fell+English+SC&family=Grenze+Gotisch:wght@700&family=Metamorphous&family=Caesar+Dressing&family=Special+Elite&family=Rock+Salt&family=Monoton&family=Fiber&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="./style.css">
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
 <canvas id="cv"></canvas>
@@ -69,7 +69,7 @@
 <span>ESQUERDA</span><button class="kbBtn" data-kb="left">A</button>
 <span>DIREITA</span><button class="kbBtn" data-kb="right">D</button>
 <span>DESVIO</span><button class="kbBtn" data-kb="dash">ESPAÇO</button>
-<span>PARRY (SEGURAR)</span><button class="kbBtn" data-kb="parry">ESPAÇO</button>
+<span>PARRY (SEGURAR E SOLTAR)</span><button class="kbBtn" data-kb="parry">ESPAÇO</button>
 <span>INTERAGIR</span><button class="kbBtn" data-kb="interact">Z</button>
 <span>PAUSA</span><button class="kbBtn" data-kb="pause">ESC</button>
 </div>
@@ -81,6 +81,7 @@
 <div class="overlay solid hidden" id="dead">
 <h1>THOR TOMBOU</h1>
 <div class="rule"><span class="ln"></span><span class="dm"></span><span class="ln"></span></div>
+<p class="sub" id="deadTaunt" style="color:#d9465a;font-size:13px">a besta ri em algum lugar do abismo.</p>
 <p class="sub">tá forçando clip.</p>
 <p class="stats">descida <b id="stWaveD">1</b> · abates <b id="stKillD">0</b> · almas <b id="stEmbD">0</b></p>
 <p class="sub" id="deadRelics" style="font-size:10px;margin-top:14px"></p>
@@ -115,8 +116,14 @@
 <div class="overlay solid hidden" id="lab">
 <p class="lu-eyebrow">PENUMBRA</p>
 <h1>SALA DE TESTES</h1>
-<p class="sub" style="font-size:10px">invoque qualquer guardião para inspecioná-lo</p>
+<div class="tabs">
+<button class="tabBtn sel" id="labTabBoss">CHEFES</button>
+<button class="tabBtn" id="labTabRooms">SALAS</button>
+<button class="tabBtn" id="labTabBuild">MONTAR SALA</button>
+</div>
 <div class="cards" id="labCards"></div>
+<div class="cards" id="labRooms" style="display:none"></div>
+<div id="labBuild" style="display:none"></div>
 <button class="mini" id="labClose">fechar [0]</button>
 </div>
 <div class="overlay solid hidden" id="shop">
@@ -126,6 +133,6 @@
 <div class="cards" id="shopCards"></div>
 <button class="mini" id="shopClose">fechar [Z]</button>
 </div>
-<script src="./game.js"></script>
+<script src="game.js"></script>
 </body>
 </html>
