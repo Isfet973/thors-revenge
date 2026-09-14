@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Thor's Revenge</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Pirata+One&family=Cinzel:wght@700&family=MedievalSharp&family=Uncial+Antiqua&family=Metal+Mania&family=Nosifer&family=Creepster&family=Eater&family=Rubik+Moonrocks&family=IM+Fell+English+SC&family=Grenze+Gotisch:wght@700&family=Metamorphous&family=Caesar+Dressing&family=Special+Elite&family=Rock+Salt&family=Monoton&family=Fiber&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="cv"></canvas>
+<div id="mobileControls" aria-hidden="true">
+  <div id="mobileJoystick" aria-label="movimento">
+    <div class="joyBase"></div><div id="joyKnob"></div>
+  </div>
+  <button class="mBtn small" id="mobilePause">II</button>
+  <button class="mBtn small" id="mobileBook">LIVRO</button>
+  <button class="mBtn" id="mobileDash">DESVIO</button>
+  <button class="mBtn" id="mobileParry">PARRY</button>
+  <button class="mBtn" id="mobileSaw">SERRA</button>
+  <button class="mBtn" id="mobileInteract">Z</button>
+  <div id="mobileHint">TOQUE E ARRASTE PARA MOVER · BOTÕES À DIREITA</div>
+</div>
+
+<button id="muteBtn" title="som">
+<svg id="icOn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor" stroke="none"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
+<svg id="icOff" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="currentColor" stroke="none"/><line x1="16" y1="9" x2="22" y2="15"/><line x1="22" y1="9" x2="16" y2="15"/></svg>
+</button>
+<div class="overlay" id="menu">
+<h1 id="gameTitle">THOR'S<br>REVENGE</h1>
+<div class="rule"><span class="ln"></span><span class="dm"></span><span class="ln"></span></div>
+<p class="sub">um cão descendo o inferno para reencarnar<br><span style="font-size:10px;color:#6e6357">clique esquerdo ou setas atacam · Z interage · [B] livro do cão</span></p>
+<button class="btn" id="startBtn">descer ao limbo</button>
+<button class="mini" id="optBtn">opções</button>
+<button class="mini" id="saveBtn">salvar / carregar</button>
+<p id="metaList"></p>
+</div>
+<div class="overlay solid hidden" id="saves">
+<h1>SAVES</h1>
+<p class="sub">três descidas independentes. o segundo e o terceiro começam vazios.</p>
+<div class="cards" id="saveCards"></div>
+<button class="mini" id="saveBack">voltar</button>
+</div>
+<div class="overlay solid hidden" id="weapons">
+<p class="lu-eyebrow">ANTES DE DESCER</p>
+<h1>ESCOLHA SUA ARMA</h1>
+<div class="diff"><button class="diffBtn sel" id="dNorm">LIMBO</button><button class="diffBtn" id="dHard">ABISMO</button></div>
+<p class="diffHint" id="diffHint">a descida padrão. o inferno na medida.</p>
+<div class="cards">
+<button class="card" id="wShot"><svg viewBox="0 0 24 24" fill="#e6dac4"><path d="M2 12 L15 5 L11.5 12 L15 19 Z M17 5 L22 12 L17 19 L19 12 Z"/></svg><h3>TIRO</h3><p>projéteis confiáveis caçam os demônios à distância. encante-os depois com gelo, fogo, veneno e trovão.</p><div class="lvl" style="color:#8a7d6c">ATAQUE À DISTÂNCIA</div></button>
+<button class="card" id="wBite"><svg viewBox="0 0 24 24" fill="none" stroke="#e6dac4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8 l3 4 3-4 3 4 3-4 3 4 3-4 M3 16 l3-4 3 4 3-4 3 4 3-4 3 4 3-4"/></svg><h3>MORDIDA DA FERA</h3><p>quando o demônio se aproxima, a fera de thor o despedaça. evolui com presas de fogo, gelo e veneno.</p><div class="lvl" style="color:#8a7d6c">ATAQUE DE PERTO</div></button>
+</div>
+</div>
+<div class="overlay solid hidden" id="options">
+<h1>OPÇÕES</h1>
+<div class="optPanel">
+<div class="optRow"><span class="optLbl">EFEITOS</span><input type="range" id="oSfx" min="0" max="100" value="80"><span class="optVal" id="oSfxV">80</span></div>
+<div class="optRow"><span class="optLbl">MÚSICA</span><input type="range" id="oMus" min="0" max="100" value="50"><span class="optVal" id="oMusV">50</span></div>
+<div class="optRow"><span class="optLbl">TREMOR DE TELA</span><button class="optChk sel" id="oShake">LIGADO</button></div>
+<div class="optRow"><span class="optLbl">NÚMEROS DE DANO</span><button class="optChk sel" id="oDmg">LIGADO</button></div>
+<div class="optSep">— SEGREDOS —</div>
+<div class="optRow"><span class="optLbl">SEGREDOS (%)</span><input type="range" id="oSecret" min="10" max="300" step="10" value="100"><span class="optVal" id="oSecretV">100</span></div>
+<div class="optNote">quanto maior, mais salas escondidas, eventos raros e chefes secretos surgem — e o inferno fica proporcionalmente mais cruel. abaixo de 100%, o limbo sossega.</div>
+<div class="optSep">— CONTROLES —</div>
+<div class="kbGrid">
+<span>CIMA</span><button class="kbBtn" data-kb="up">W</button>
+<span>BAIXO</span><button class="kbBtn" data-kb="down">S</button>
+<span>ESQUERDA</span><button class="kbBtn" data-kb="left">A</button>
+<span>DIREITA</span><button class="kbBtn" data-kb="right">D</button>
+<span>DESVIO</span><button class="kbBtn" data-kb="dash">ESPAÇO</button>
+<span>PARRY (SEGURAR)</span><button class="kbBtn" data-kb="parry">ESPAÇO</button>
+<span>INTERAGIR</span><button class="kbBtn" data-kb="interact">Z</button>
+<span>PAUSA</span><button class="kbBtn" data-kb="pause">ESC</button>
+</div>
+<button class="mini" id="oRestore">restaurar padrão</button>
+<div class="optNote">INTERAGIR: <b>Z</b> por padrão — pode ser alterado acima.</div>
+</div>
+<button class="btn" id="optBack" style="margin-top:22px">voltar</button>
+</div>
+<div class="overlay solid hidden" id="dead">
+<h1>THOR TOMBOU</h1>
+<div class="rule"><span class="ln"></span><span class="dm"></span><span class="ln"></span></div>
+<p class="sub">tá forçando clip.</p>
+<p class="stats">descida <b id="stWaveD">1</b> · abates <b id="stKillD">0</b> · almas <b id="stEmbD">0</b></p>
+<p class="sub" id="deadRelics" style="font-size:10px;margin-top:14px"></p>
+<button class="btn" id="retryBtn">levantar de novo</button>
+</div>
+<div class="overlay solid hidden" id="win">
+<h1>O CÃO<br>DESCE</h1>
+<div class="rule"><span class="ln"></span><span class="dm"></span><span class="ln"></span></div>
+<p class="sub">fim do círculo um.<br>ele desce — e algo, lá embaixo, já o aguarda.</p>
+<p class="stats">abates <b id="stKillW">0</b> · almas <b id="stEmbW">0</b> · corações <b id="stHpW">4</b></p>
+<button class="btn" id="menuBtn">voltar ao menu</button>
+</div>
+<div class="overlay solid hidden" id="pause">
+<h1>PAUSA</h1>
+<div class="rule"><span class="ln"></span><span class="dm"></span><span class="ln"></span></div>
+<button class="btn" id="resumeBtn">continuar</button>
+<button class="mini" id="optBtn2">opções</button>
+<p class="sub" style="font-size:10px;margin-top:16px">[B] livro do cão — bênçãos e bestiário</p>
+<button class="btn" id="restartBtn" style="margin-top:14px">recomeçar</button>
+</div>
+<div class="overlay solid hidden" id="levelup">
+<p class="lu-eyebrow" id="blessEyebrow">TESOURO</p>
+<h1>ESCOLHA UMA BÊNÇÃO</h1>
+<div class="cards" id="cards"></div>
+</div>
+<div class="overlay solid hidden" id="book">
+<p class="lu-eyebrow">LIVRO DO CÃO</p>
+<h1>O LIVRO</h1>
+<div id="bookBody"></div>
+<button class="mini" id="bookClose">fechar [B]</button>
+</div>
+<div class="overlay solid hidden" id="lab">
+<p class="lu-eyebrow">PENUMBRA</p>
+<h1>SALA DE TESTES</h1>
+<p class="sub" style="font-size:10px">invoque qualquer guardião para inspecioná-lo</p>
+<div class="cards" id="labCards"></div>
+<button class="mini" id="labClose">fechar [0]</button>
+</div>
+<div class="overlay solid hidden" id="shop">
+<p class="lu-eyebrow">LOJA DO LIMBO</p>
+<h1>O ERRANTE</h1>
+<p class="stats" style="margin-top:4px">almas <b id="shopSouls">0</b></p>
+<div class="cards" id="shopCards"></div>
+<button class="mini" id="shopClose">fechar [Z]</button>
+</div>
+<script src="game.js"></script>
+</body>
+</html>
