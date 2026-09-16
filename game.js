@@ -292,6 +292,7 @@ const lg=AC.createGain();lg.gain.value=.05;lfo.connect(lg);lg.connect(g1.gain);l
 beatT=AC.currentTime+.6;
 }
 function getMusicTheme(){
+if(game.state==='knightintro'||game.state==='knightdeath'||knightAny())return'cerberus';
 if(game.state==='e404intro'||game.state==='reideath'||game.state==='reiintro'||e404Any()||reiAny())return game.state==='e404intro'||e404Any()?'e404':'rei';
 if((game.state==='bossintro'||boss.active&&!boss.dying)&&(game.state!=='menu'))return'cerberus';
 if(miniBossAny())return'miniboss';
@@ -424,11 +425,11 @@ for(let i=0;i<10;i++)groundEmbers.push({x:ROOM.x+rnd(30,m.w-30),y:ROOM.y+rnd(30,
 }
 }
 /* ============ meta-progressão ============ */
-const EMPTY_META=()=>({kills:0,deaths:0,wins:0,e404:0,souls:0,rooms:0,done:{},seen:{}});
+const EMPTY_META=()=>({kills:0,deaths:0,wins:0,e404:0,souls:0,rooms:0,done:{},seen:{},knights:{conquest:0,war:0,famine:0,death:0}});
 let activeSave=1;
 const META=EMPTY_META();
-function normalizeMeta(d){const m=EMPTY_META();if(!d)return m;for(const k of ['kills','deaths','wins','e404','souls','rooms'])if(typeof d[k]==='number')m[k]=Math.max(0,d[k]);if(d.done&&typeof d.done==='object')m.done={...d.done};if(d.seen&&typeof d.seen==='object')m.seen={...d.seen};return m;}
-function copyMeta(src,dst){for(const k of ['kills','deaths','wins','e404','souls','rooms'])dst[k]=src[k];dst.done={...src.done};dst.seen={...src.seen};}
+function normalizeMeta(d){const m=EMPTY_META();if(!d)return m;for(const k of ['kills','deaths','wins','e404','souls','rooms'])if(typeof d[k]==='number')m[k]=Math.max(0,d[k]);if(d.done&&typeof d.done==='object')m.done={...d.done};if(d.seen&&typeof d.seen==='object')m.seen={...d.seen};if(d.knights&&typeof d.knights==='object')m.knights={conquest:Math.max(0,d.knights.conquest|0),war:Math.max(0,d.knights.war|0),famine:Math.max(0,d.knights.famine|0),death:Math.max(0,d.knights.death|0)};return m;}
+function copyMeta(src,dst){for(const k of ['kills','deaths','wins','e404','souls','rooms'])dst[k]=src[k];dst.done={...src.done};dst.seen={...src.seen};if(src.knights)dst.knights={...src.knights};}
 function loadMeta(){try{activeSave=Math.max(1,Math.min(3,Number(localStorage.getItem('thorActiveSave'))||1));let d=JSON.parse(localStorage.getItem('thorSave'+activeSave));if(activeSave===1&&!d){const legacy=JSON.parse(localStorage.getItem('thorMeta'));if(legacy){d=legacy;localStorage.setItem('thorSave1',JSON.stringify(normalizeMeta(d)));}}copyMeta(normalizeMeta(d),META);for(const slot of [1,2,3]){if(!localStorage.getItem('thorSave'+slot))localStorage.setItem('thorSave'+slot,JSON.stringify(EMPTY_META()));}}catch(e){copyMeta(EMPTY_META(),META);}}
 function saveMeta(){try{localStorage.setItem('thorSave'+activeSave,JSON.stringify(META));localStorage.setItem('thorActiveSave',String(activeSave));}catch(e){}}
 function saveSlotData(slot){try{const d=localStorage.getItem('thorSave'+slot);return d?normalizeMeta(JSON.parse(d)):EMPTY_META();}catch(e){return EMPTY_META();}}
@@ -472,6 +473,11 @@ fallK:-1,fallFrom:null,fallTo:null,fallTarget:null,roomFade:0,treasureOpen:false
 shopItems:[],roomEvent:null,e404T:0,e404Spawned:false,
 reiT:0,reiX:0,reiY:0,reiSpawned:false,reiFought:false,kingsoul:false,kingT:8,
 rkP2:false,rkUltT:0,rkUlt:null,
+/* Cavaleiros do Apocalipse — cutscene + estado de triumfo */
+knightIntro:null,knightIntroT:0,knightSpawned:false,
+knightDeath:null,knightT:0,knightX:0,knightY:0,knightDead:null,knightTriunfo:null,
+knightHearts:[],knightTimer:0,knightHeartsCollected:0,knightHeartsNeeded:0,
+knightInvuln:false,
 dev:false,god:false,
 roomQueue:[],
 weapon:null,hard:false,hasShot:false,hasBite:false,hasParry:false,
@@ -681,6 +687,11 @@ game.roomFade=0;game.treasureOpen=false;game.shopItems=[];game.keeper=null;game.
 game.builderLive=false;game.deadTaunt='';
 game.reiT=0;game.reiX=0;game.reiY=0;game.reiSpawned=false;game.reiFought=false;game.kingsoul=false;game.kingT=8;
 game.rkP2=false;game.rkUltT=0;game.rkUlt=null;
+/* reset Cavaleiros do Apocalipse */
+game.knightIntro=null;game.knightIntroT=0;game.knightSpawned=false;
+game.knightDead=null;game.knightT=0;game.knightX=0;game.knightY=0;game.knightTriunfo=null;
+game.knightHearts=[];game.knightTimer=0;game.knightHeartsCollected=0;game.knightHeartsNeeded=0;
+game.knightInvuln=false;
 game.decor=[];game.roomWindow=null;game.windowScene=null;game.puzzle=null;game.seenGlyphs=[];game.penumbra=null;
 game.forceNext=null;game.meleeHitT=0;game.meleeHitRk=false;
 game.roomQueue=[];
@@ -1582,6 +1593,9 @@ META.deaths++;saveMeta();
 function hurtPlayer(){
 if(game.god)return;
 if(player.inv>0||player.dashT>0||player.dead)return;
+/* Triunfo dos Cavaleiros: cão e cavaleiro imortais — qualquer dano normal é ignorado
+   (apenas hitkills telegrafados ainda ferem) */
+if(game.knightInvuln)return;
 player.hp--;player.inv=1.15+P.invBonus;game.hurtV=1;game.shake=Math.max(game.shake,14);
 game.hitstop=.09;heartsPopT=.6;heartsPopIdx=player.hp;
 sparks(player.x,player.y,'#d9465a',10,220,.5,3,true);sfx.hurt();
@@ -1622,6 +1636,31 @@ return base*m;
 }
 /* sombra do rei (rkm) é invulnerável durante a fase 2 — ataques passam direto */
 function shadowInvuln(e){return e&&e.type==='rkm'&&game.rkP2;}
+/* cavaleiro montado: dano vai para o cavalo primeiro, não para o cavaleiro.
+   Retorna true se o dano foi redirecionado (já aplicado ao cavalo). */
+function knightRedirectHorse(e,dmg){
+if(!e)return false;
+if(!['cw1','cw2','cw3','cw4'].includes(e.type))return false;
+/* Triunfo da Morte: conta 1 hit cada vez que acertam o cavaleiro */
+if(e.triunfo&&e.type==='cw4'){
+if(game.knightHeartsCollected<game.knightHeartsNeeded)game.knightHeartsCollected++;
+e.flash=.2;
+sparks(e.x,e.y,'#c9a44c',6,180,.4,3,true);
+return true;
+}
+/* outros triunfos: cavaleiro imortal */
+if(e.invuln||e.triunfo)return true;
+if(e.p2||!e.horseHp||e.horseHp<=0)return false;
+/* dano real ao cavalo */
+e.horseHp-=dmg;
+e.flash=Math.max(e.flash||0,.15);
+sparks(e.x,e.y-30,'#ff8f3d',4,140,.4,2.5,true);
+if(e.horseHp<=0){
+/* cavalo morre — dispara transição de fase na IA */
+e.horseHp=0;
+}
+return true;
+}
 /* cor falsa usada pelos projéteis das sombras — para o jogador distinguir
    qual rei está jogando na cor "certa" (a real) versus a cor errada (sombras). */
 const RKM_FAKE_COLOR='#7a5b8a';
@@ -1658,7 +1697,7 @@ function explodeAt(x,y,r,dmg){
 for(const e of enemies){
 if(e.dead)continue;
 if(dist(x,y,e.x,e.y)<r+e.r){
-if(!shadowInvuln(e)){e.hp-=elemDmg(e,dmg);e.flash=.15;}
+if(!shadowInvuln(e)){if(!knightRedirectHorse(e,dmg)){e.hp-=elemDmg(e,dmg);e.flash=.15;}}
 sparks(e.x,e.y,'#ff8f3d',3,140,.3,2.5,true);
 if(e.hp<=0)killEnemy(e);
 }
@@ -1816,7 +1855,7 @@ let hit=false;
 for(const e of enemies){
 if(e.dead)continue;
 if(dist(b.x,b.y,e.x,e.y)<e.r+b.r+2){
-if(!shadowInvuln(e)){e.hp-=elemDmg(e,b.dmg);e.flash=.1;}
+if(!shadowInvuln(e)){if(!knightRedirectHorse(e,b.dmg)){e.hp-=elemDmg(e,b.dmg);e.flash=.1;}}
 hit=true;sfx.ehit();
 sparks(b.x,b.y,b.elem?ELEM_DATA[b.elem].c:'#cfe9ff',3,150,.3,2,true);
 if(b.elem)applyElem({kind:'enemy',obj:e},b.elem,b.dmg);
@@ -1866,7 +1905,7 @@ for(const e of enemies){
 if(e.dead)continue;
 const d=dist(player.x,player.y,e.x,e.y);
 if(d<range+e.r&&Math.abs(angDiff(Math.atan2(e.y-player.y,e.x-player.x),ang))<1.0){
-if(!shadowInvuln(e)){e.hp-=elemDmg(e,dmg);e.flash=.12;}
+if(!shadowInvuln(e)){if(!knightRedirectHorse(e,dmg)){e.hp-=elemDmg(e,dmg);e.flash=.12;}}
 markMeleeHit(e);
 const kb=Math.atan2(e.y-player.y,e.x-player.x);
 e.x+=Math.cos(kb)*44;e.y+=Math.sin(kb)*44;
@@ -1918,7 +1957,7 @@ for(const e of enemies){
 if(e.dead)continue;
 const d=dist(player.x,player.y,e.x,e.y);
 if(d<range+e.r&&Math.abs(angDiff(Math.atan2(e.y-player.y,e.x-player.x),player.sawAim))<1.0){
-if(!shadowInvuln(e)){e.hp-=elemDmg(e,dmg);e.flash=.08;}
+if(!shadowInvuln(e)){if(!knightRedirectHorse(e,dmg)){e.hp-=elemDmg(e,dmg);e.flash=.08;}}
 markMeleeHit(e);
 sparks(e.x,e.y,'#d9465a',2,160,.3,2.5,true);
 if(e.hp<=0)killEnemy(e);
@@ -1957,7 +1996,7 @@ for(const e of enemies){
 if(e.dead||e.hitT>0)continue;
 if(dist(s.x,s.y,e.x,e.y)<20+e.r){
 if(shadowInvuln(e)){e.hitT=.28;e.flash=.1;sfx.ehit();}
-else{e.hp-=elemDmg(e,dmg);e.hitT=.28;e.flash=.1;sfx.ehit();}
+else if(!knightRedirectHorse(e,dmg)){e.hp-=elemDmg(e,dmg);e.hitT=.28;e.flash=.1;sfx.ehit();}
 sparks(s.x,s.y,'#d9465a',3,170,.3,2.5,true);
 if(e.hp<=0)killEnemy(e);
 }
@@ -1992,7 +2031,7 @@ for(const e of enemies){
 if(e.dead)continue;
 const d=dist(player.x,player.y,e.x,e.y);
 if(d<range+e.r&&Math.abs(angDiff(Math.atan2(e.y-player.y,e.x-player.x),a))<1.2){
-if(!shadowInvuln(e)){e.hp-=elemDmg(e,dmg);e.flash=.12;}
+if(!shadowInvuln(e)){if(!knightRedirectHorse(e,dmg)){e.hp-=elemDmg(e,dmg);e.flash=.12;}}
 markMeleeHit(e);
 sparks(e.x,e.y,'#e6dac4',5,200,.4,3,true);
 if(e.hp<=0)killEnemy(e);
@@ -2024,7 +2063,7 @@ sparks(player.x,player.y,'#9fd8ff',14,240,.5,3,true);
 for(const e of enemies){
 if(e.dead)continue;
 if(dist(player.x,player.y,e.x,e.y)<radius+e.r){
-if(!shadowInvuln(e)){e.hp-=dmg;e.flash=.1;}
+if(!shadowInvuln(e)){if(!knightRedirectHorse(e,dmg)){e.hp-=dmg;e.flash=.1;}}
 e.slowT=2.2;
 if(e.hp<=0)killEnemy(e);
 }
@@ -2077,7 +2116,7 @@ for(const e of enemies){
 if(e.dead||w.hit.has(e))continue;
 if(Math.abs(dist(e.x,e.y,w.x,w.y)-w.r)<26+e.r){
 w.hit.add(e);
-if(!shadowInvuln(e)){e.hp-=elemDmg(e,w.dmg);e.flash=.12;}
+if(!shadowInvuln(e)){if(!knightRedirectHorse(e,w.dmg)){e.hp-=elemDmg(e,w.dmg);e.flash=.12;}}
 sparks(e.x,e.y,'#ffd9a0',4,160,.35,3,true);
 if(e.hp<=0)killEnemy(e);
 }
@@ -2109,7 +2148,7 @@ for(const e of enemies){
 if(e.dead||e.hitT>0)continue;
 if(dist(ox,oy,e.x,e.y)<16+e.r){
 if(shadowInvuln(e)){e.hitT=.35;e.flash=.1;}
-else{e.hp-=elemDmg(e,dmg);e.hitT=.35;e.flash=.1;}
+else if(!knightRedirectHorse(e,dmg)){e.hp-=elemDmg(e,dmg);e.hitT=.35;e.flash=.1;}
 sparks(ox,oy,'#9d6bb5',3,140,.3,2.5,true);
 if(e.hp<=0)killEnemy(e);
 }
@@ -2147,7 +2186,7 @@ if(e.dead||e.hitT>0)continue;
 const d=dist(player.x,player.y,e.x,e.y);
 if(d<reach+e.r&&Math.abs(angDiff(Math.atan2(e.y-player.y,e.x-player.x),lightBeam.ang))<.1){
 if(shadowInvuln(e)){e.hitT=.25;e.flash=.1;}
-else{e.hp-=elemDmg(e,dmg);e.hitT=.25;e.flash=.1;}
+else if(!knightRedirectHorse(e,dmg)){e.hp-=elemDmg(e,dmg);e.hitT=.25;e.flash=.1;}
 sparks(e.x,e.y,'#fff3c4',2,120,.25,2,true);
 if(e.hp<=0)killEnemy(e);
 }
@@ -2214,7 +2253,7 @@ for(const e of enemies){
 if(e.dead||e.hitT>0)continue;
 if(dist(h.x,h.y,e.x,e.y)<e.r+15){
 if(shadowInvuln(e)){e.hitT=.3;e.flash=.1;sfx.ehit();}
-else{e.hp-=elemDmg(e,7*P.dmgMult);e.hitT=.3;e.flash=.1;sfx.ehit();}
+else if(!knightRedirectHorse(e,7*P.dmgMult)){e.hp-=elemDmg(e,7*P.dmgMult);e.hitT=.3;e.flash=.1;sfx.ehit();}
 sparks(h.x,h.y,'#8fd0e8',3,150,.3,2,true);
 if(e.hp<=0)killEnemy(e);
 }
@@ -2362,8 +2401,37 @@ e.r=40;e.hp=Math.round((game.hard?1.35:1)*(6800+c*190));e.maxHp=e.hp;e.sp=game.h
 e.st='float';e.stT=0;e.atkT=1.6;e.patIdx=-1;e.pat=null;e.data=null;e.dashT=0;e.dashA=0;
 e.pats=E404_PATS.slice();
 }
+/* ==== CAVALEIROS DO APOCALIPSE — bosses secretos do endgame ==== */
+else if(type==='cw1'){
+/* CAVALEIRO BRANCO — CONQUISTA. Muito HP, duas fases, Triunfo de coletar corações. */
+e.r=38;e.hp=Math.round(8200+c*180);e.maxHp=e.hp;e.sp=game.hard?94:78;
+e.st='float';e.stT=0;e.atkT=1.4;e.patIdx=-1;e.pat=null;e.data=null;e.dashT=0;e.dashA=0;
+e.p2=false;e.weapon='sword';e.weaponSwapT=0;e.horseHp=Math.round(2200+c*40);e.horseMaxHp=e.horseHp;
+e.pats=CW1_PATS.slice();
+}
+else if(type==='cw2'){
+/* CAVALEIRO VERMELHO — GUERRA. Foco em projéteis e armas invocadas. */
+e.r=40;e.hp=Math.round(8600+c*200);e.maxHp=e.hp;e.sp=game.hard?88:72;
+e.st='float';e.stT=0;e.atkT=1.2;e.patIdx=-1;e.pat=null;e.data=null;e.dashT=0;e.dashA=0;
+e.p2=false;e.horseHp=Math.round(2400+c*44);e.horseMaxHp=e.horseHp;
+e.pats=CW2_PATS.slice();
+}
+else if(type==='cw3'){
+/* CAVALEIRO PRETO — FOME. Mecânica de Devoração (engole Thor e copia poderes). */
+e.r=42;e.hp=Math.round(9000+c*220);e.maxHp=e.hp;e.sp=game.hard?86:70;
+e.st='float';e.stT=0;e.atkT=1.5;e.patIdx=-1;e.pat=null;e.data=null;e.dashT=0;e.dashA=0;
+e.p2=false;e.horseHp=Math.round(2600+c*50);e.horseMaxHp=e.horseHp;
+e.copied=[];e.devourT=0;e.scaleAng=0;e.pats=CW3_PATS.slice();
+}
+else if(type==='cw4'){
+/* CAVALEIRO DESCORADO — MORTE. O mais difícil. Hitkills com sinais claros. */
+e.r=40;e.hp=Math.round(9800+c*240);e.maxHp=e.hp;e.sp=game.hard?110:90;
+e.st='float';e.stT=0;e.atkT=1.0;e.patIdx=-1;e.pat=null;e.data=null;e.dashT=0;e.dashA=0;
+e.p2=false;e.horseHp=Math.round(2800+c*60);e.horseMaxHp=e.horseHp;
+e.pats=CW4_PATS.slice();
+}
 else{e.r=10;e.hp=10;e.sp=game.hard?245:210;}
-if(type!=='e404'&&type!=='rk'&&type!=='rkm'){
+if(type!=='e404'&&type!=='rk'&&type!=='rkm'&&type!=='cw1'&&type!=='cw2'&&type!=='cw3'&&type!=='cw4'){
 const sm=1+(secretMul()-1)*.15;
 if(sm!==1){e.hp=Math.max(1,Math.round(e.hp*sm));if(e.maxHp)e.maxHp=e.hp;}
 }
@@ -2388,6 +2456,22 @@ game.state='reideath';game.reiT=0;game.reiX=e.x;game.reiY=e.y;
 bullets=[];ebullets=[];rings=[];geyserMarks=[];spawnMarks=[];shockwaves=[];enemies=[];
 thrownSaw=null;lightBeam=null;
 for(let i=0;i<12;i++)pickups.push({type:'soul',x:e.x+rnd(-30,30),y:e.y+rnd(-30,30),t:0,ph:rnd(TAU)});
+return;
+}
+/* ==== Cavaleiros do Apocalipse: ao cair, saltam para a cutscene de morte ==== */
+if(e.type==='cw1'||e.type==='cw2'||e.type==='cw3'||e.type==='cw4'){
+const which={cw1:'conquest',cw2:'war',cw3:'famine',cw4:'death'}[e.type];
+sfx.kill();sfx.explode();sfx.headDie();
+game.shake=28;game.flash=.7;game.hitstop=.3;
+const col={cw1:'#e6dac4',cw2:'#d9465a',cw3:'#5a4a55',cw4:'#c9a44c'}[e.type];
+sparks(e.x,e.y,col,40,360,1.0,5,true);
+sparks(e.x,e.y,'#ffd9a0',24,280,.7,3.5,true);
+game.knightDead=which;game.knightX=e.x;game.knightY=e.y;game.knightT=0;game.knightTriunfo=e.triunfo;
+META.knights[which]++;saveMeta();
+game.state='knightdeath';
+bullets=[];ebullets=[];rings=[];geyserMarks=[];spawnMarks=[];shockwaves=[];enemies=[];
+thrownSaw=null;lightBeam=null;
+for(let i=0;i<20;i++)pickups.push({type:'soul',x:e.x+rnd(-40,40),y:e.y+rnd(-40,40),t:0,ph:rnd(TAU)});
 return;
 }
 sfx.kill();
@@ -2534,6 +2618,13 @@ if(e.type==='vi'){viuvaAI(e,dt,a,d,slowMul);continue;}
 if(e.type==='gz'){golemAI(e,dt,a,d,slowMul);continue;}
 if(e.type==='rk'||e.type==='rkm'){reiAI(e,dt,a,d,slowMul);continue;}
 if(e.type==='e404'){e404AI(e,dt,a,d,slowMul);continue;}
+if(e.type==='cw1'||e.type==='cw2'||e.type==='cw3'||e.type==='cw4'){
+cwKnightAI(e,dt,a,d,slowMul);
+/* checa triunfo ativo */
+const k=knightAny2();
+if(k)updateKnightTriumph(dt,k);
+continue;
+}
 if(e.type==='al'){
 const wv=Math.sin(game.t*2.2+e.seed)*.7;
 mx=Math.cos(a)-Math.sin(a)*wv;my=Math.sin(a)+Math.cos(a)*wv;
@@ -4072,6 +4163,1282 @@ txt('ELE SEMPRE ESTEVE AQUI',W/2,H*.24+86,MONO,13,'#9c8f7c','center',6);
 ctx.globalAlpha=1;
 }
 }
+/* ===================================================================== *
+ *  CAVALEIROS DO APOCALIPSE — 4 bosses secretos do endgame
+ *  cw1=Conquista(Branco) cw2=Guerra(Vermelho) cw3=Fome(Preto) cw4=Morte(Descorado)
+ *  Cada um: 2 fases (montado/desmontado), Triunfo (ultimate), drop exclusivo.
+ * ===================================================================== */
+const KNIGHT_DATA={
+cw1:{name:'CAVALEIRO BRANCO',concept:'CONQUISTA',col:'#e6dac4',accent:'#c9a44c',dropId:'knight_conquest',
+introLines:[{t:1.0,t1:4.4,txt:'o cão aventureiro ousou escalar o cavalo de branco.'},{t:5.0,t1:8.4,txt:'tudo que ele toca... converge.'},{t:9.0,t1:12.4,txt:'a conquista não pede permissão.'},{t:13.0,t1:16.4,txt:'suba, se ousar.'}],
+introTotal:19.5,
+deathLines:[{t:.8,t1:3.2,txt:'...então... conquistado...?'},{t:3.6,t1:6.4,txt:'a coroa... ainda pesa.'},{t:6.8,t1:9.0,txt:'até nos vermos de novo, cachorro.'}],deathTotal:11.0},
+cw2:{name:'CAVALEIRO VERMELHO',concept:'GUERRA',col:'#d9465a',accent:'#8a1c2c',dropId:'knight_war',
+introLines:[{t:1.0,t1:4.4,txt:'o cão cheira pólvora... ou é só sangue?'},{t:5.0,t1:8.4,txt:'guerra não escolhe lado. escolhe vítima.'},{t:9.0,t1:12.4,txt:'cada arma que eu carrego... já matou um deus.'},{t:13.0,t1:16.4,txt:'vem, cachorro. vem para a frente.'}],
+introTotal:19.5,
+deathLines:[{t:.8,t1:3.2,txt:'a guerra... nunca acaba... só descansa.'},{t:3.6,t1:6.4,txt:'guarde minha arma. use-a bem.'},{t:6.8,t1:9.0,txt:'até a próxima batalha.'}],deathTotal:11.0},
+cw3:{name:'CAVALEIRO PRETO',concept:'FOME',col:'#3a2f3a',accent:'#7a5b8a',dropId:'knight_famine',
+introLines:[{t:1.0,t1:4.4,txt:'o cão tem fome de vingança. eu tenho fome de tudo.'},{t:5.0,t1:8.4,txt:'não destruo o que comoo. transformo.'},{t:9.0,t1:12.4,txt:'seu poder... será meu por um tempo.'},{t:13.0,t1:16.4,txt:'a balança pesa tua alma.'}],
+introTotal:19.5,
+deathLines:[{t:.8,t1:3.2,txt:'fome... saciada...?'},{t:3.6,t1:6.4,txt:'o peso do que carreguei... agora é teu.'},{t:6.8,t1:9.0,txt:'devora o mundo por mim.'}],deathTotal:11.0},
+cw4:{name:'CAVALEIRO DESCORADO',concept:'MORTE',col:'#c9a44c',accent:'#5e5036',dropId:'knight_death',
+introLines:[{t:1.0,t1:4.4,txt:'o cão... finalmente chegou ao fim do caminho.'},{t:5.0,t1:8.4,txt:'eu sou o último peso na balança.'},{t:9.0,t1:12.4,txt:'não há走廊 sem fim. só eu.'},{t:13.0,t1:16.4,txt:'fica quieto, cachorro. a morte escuta.'}],
+introTotal:19.5,
+deathLines:[{t:.8,t1:3.2,txt:'...impossível...'}, {t:3.6,t1:6.4,txt:'a morte... morre?'},{t:6.8,t1:9.0,txt:'a coroa amarela agora é tua.'}],deathTotal:11.5}
+};
+/* padrões dos 4 cavaleiros — Fase 1 (montado) */
+const CW1_PATS=['sword','lance','axe','bow','charge','combo'];
+const CW2_PATS=['barrage','cannons','rain','zone','charge','spread'];
+const CW3_PATS=['scale','scarcity','devour','weight','charge','hunger'];
+const CW4_PATS=['plague','chase','wither','charge','scythe','pestilence'];
+/* padrões Fase 2 (desmontado) — overrides do pats[] */
+const CW1_P2=['multiweapon','whirl','arrowstorm','lunge'];
+const CW2_P2=['armory','bombardment','bulletstorm','carpet'];
+const CW3_P2=['absorb','mirror','empty','staving'];
+const CW4_P2=['blink','falsecut','deathmark','reaper'];
+/* helper: nome bonito do cavaleiro para cutscene */
+function knightAny(){return enemies.find(e=>['cw1','cw2','cw3','cw4'].includes(e.type)&&!e.dead);}
+function knightEntryID(){return game.knightIntro;}
+/* ====== intro dos cavaleiros — estados: 'knightintroN' onde N é cw1..cw4 ====== */
+function startKnightIntro(id){
+game.knightIntro=id;game.knightIntroT=0;game.knightSpawned=false;
+game.state='knightintro';
+}
+function updateKnightIntro(dt){
+game.knightIntroT+=dt;
+const t=game.knightIntroT;
+const id=game.knightIntro;
+const kd=KNIGHT_DATA[id];
+if(!kd)return;
+/* ambiência sonora por conceito */
+if(Math.random()<dt*2.4){
+if(id==='cw1')blip('sine',rnd(180,260),rnd(120,180),.5,.06);
+else if(id==='cw2')blip('sawtooth',rnd(80,140),rnd(50,90),.4,.08);
+else if(id==='cw3')blip('sine',rnd(60,100),rnd(40,80),.6,.1);
+else blip('triangle',rnd(40,80),rnd(30,60),.8,.12);
+}
+const totalIntro=kd.introTotal;
+if(t>totalIntro-2.5&&t<totalIntro-1)game.shake=Math.max(game.shake,2);
+if(!game.knightSpawned&&t>=totalIntro-2.5){
+game.knightSpawned=true;game.flash=.6;game.shake=20;
+sfx.roar();sfx.howl();
+}
+if(t>=totalIntro){
+game.state='play';
+spawnMarkAt(id,game.absMain.x+game.absMain.w/2,game.absMain.y+game.absMain.h*.32,true);
+game.banner={type:'boss',txt:kd.name,sub:kd.concept+' — Cavaleiro do Apocalipse',t:0,dur:3};
+sfx.roar();
+}
+}
+function drawKnightIntro(){
+const t=game.knightIntroT;
+const id=game.knightIntro;
+const kd=KNIGHT_DATA[id];if(!kd)return;
+/* fundo escurecido, cor temática pulsando */
+ctx.fillStyle='rgba(2,1,3,.92)';ctx.fillRect(0,0,W,H);
+const baseA=.06+.04*Math.sin(game.t*1.6);
+ctx.fillStyle=kd.col;ctx.globalAlpha=baseA;
+ctx.fillRect(0,0,W,H);
+ctx.globalAlpha=1;
+/* linhas de diálogo */
+for(const L of kd.introLines){
+const a=ramp(t,L.t0,L.t0+.7)*(1-ramp(t,L.t1-.5,L.t1));
+if(a<=0)continue;
+ctx.globalAlpha=a;
+txt(L.txt,W/2+rnd(-1,1),H*.3,MONO,16,kd.col,'center',2);
+ctx.globalAlpha=a*.35;
+txt(L.txt,W/2+2,H*.3+2,MONO,16,kd.accent,'center',2);
+ctx.globalAlpha=1;
+}
+/* cavaleiro materializando-se no centro */
+if(t>5){
+const mat=ramp(t,5,kd.introTotal-2);
+drawKnightBody(id,W/2,H*.6,(.4+mat*1.1)*38,mat);
+}
+/* banner final */
+if(t>=kd.introTotal-2.5){
+const a=ramp(t,kd.introTotal-2.5,kd.introTotal-1.9);
+ctx.globalAlpha=a;
+txt(kd.name,W/2+rnd(-2,2),H*.22,DISP,84,kd.col);
+ctx.globalAlpha=a*.55;
+txt(kd.name,W/2+5,H*.22+4,DISP,84,kd.accent);
+ctx.globalAlpha=a;
+txt('CAVALEIRO DO APOCALIPSE — '+kd.concept,W/2,H*.22+74,MONO,12,kd.accent,'center',6);
+ctx.globalAlpha=1;
+}
+}
+/* ====== morte do cavaleiro ====== */
+function updateKnightDeath(dt){
+game.knightT+=dt;
+updatePlayer(dt);
+const t=game.knightT;
+const id=game.knightDead;
+const kd=KNIGHT_DATA[id];if(!kd)return;
+if(t>1&&Math.random()<dt*12){
+particles.push({x:game.knightX+rnd(-30,30),y:game.knightY+rnd(-60,40),vx:rnd(-30,30),vy:rnd(-140,-40),life:rnd(.8,1.8),t:0,r:rnd(2,4),c:Math.random()<.5?kd.col:kd.accent,drag:.8,glow:Math.random()<.3});
+}
+if(t>=kd.deathTotal){
+const rr=game.mapRooms[game.roomIdx];
+if(rr&&!rr.cleared){rr.cleared=true;game.waveState='done';openDoors();}
+/* drop exclusivo do cavaleiro */
+pickups.push({type:'knightrelic',x:game.knightX,y:game.knightY,t:0,ph:rnd(TAU),relicId:kd.dropId,relicColor:kd.col,relicGlow:kd.accent});
+/* se derrotou os 4 cavaleiros, drop bônus extra */
+const k=META.knights;
+if(k.conquest>=1&&k.war>=1&&k.famine>=1&&k.death>=1&&!META.done.apocalypse){
+pickups.push({type:'knightrelic',x:game.knightX,y:game.knightY+50,t:0,ph:rnd(TAU),relicId:'apocalypse',relicColor:'#ffd9a0',relicGlow:'#d9465a'});
+game.banner={type:'circle',txt:'OS QUATRO CAVALOS DESCERAM',name:'CAVALEIROS DO APOCALIPSE',sub:'o círculo se fecha. o cão enfrentou o fim e voltou.',t:0,dur:5};
+META.done.apocalypse=1;saveMeta();
+sfx.levelup();sfx.roar();sfx.win();
+sparks(game.knightX,game.knightY,'#ffd9a0',40,360,.9,5,true);
+sparks(game.knightX,game.knightY,'#d9465a',24,260,.7,3.5,true);
+game.flash=.7;
+} else {
+game.banner={type:'small',txt:'CAVALEIRO CAIU',sub:'um artefato restos no chão',t:0,dur:2.4};
+}
+game.state='play';
+sfx.echo();
+}
+}
+function drawKnightDeathUI(){
+const t=game.knightT;
+const id=game.knightDead;
+const kd=KNIGHT_DATA[id];if(!kd)return;
+ctx.fillStyle='rgba(2,1,3,.88)';ctx.fillRect(0,0,W,H);
+/* pulso de fundo */
+ctx.globalAlpha=.08+.06*Math.sin(game.t*4);
+ctx.fillStyle=kd.col;ctx.fillRect(0,0,W,H);
+ctx.globalAlpha=1;
+/* corpo do cavaleiro em despedida */
+drawKnightBody(id,game.knightX,game.knightY,38,Math.max(0,1-t/4));
+/* linhas de morte */
+for(const L of kd.deathLines){
+const a=ramp(t,L.t0,L.t0+.5)*(1-ramp(t,L.t1-.4,L.t1));
+if(a<=0)continue;
+ctx.globalAlpha=a;
+txt(L.txt,W/2,H*.78,MONO,15,kd.col,'center',2);
+ctx.globalAlpha=1;
+}
+/* se todos os 4 caíram, mostra a conquista */
+const k=META.knights;
+if(k.conquest>=1&&k.war>=1&&k.famine>=1&&k.death>=1&&t>4){
+const a=ramp(t,4,5);
+ctx.globalAlpha=a;
+txt('O APOCALIPSE PASSOU',W/2,H*.5,DISP,46,'#ffd9a0');
+ctx.globalAlpha=a*.6;
+txt('O APOCALIPSE PASSOU',W/2+3,H*.5+3,DISP,46,'#d9465a');
+ctx.globalAlpha=a;
+txt('conquista · guerra · fome · morte',W/2,H*.55,MONO,12,'#c9a44c','center',4);
+ctx.globalAlpha=1;
+}
+}
+/* ====== desenho do corpo do cavaleiro (cavalo opcional) ====== */
+function drawKnightBody(type,x,y,s,alpha){
+if(alpha<=0)return;
+const kd=KNIGHT_DATA[type];
+if(!kd)return;
+ctx.save();
+ctx.translate(x,y);
+ctx.scale(s/38,s/38);
+ctx.globalAlpha=alpha;
+/* cavalo se vivo */
+const showHorse=type==='cw1'?true:type==='cw2'?true:type==='cw3'?true:type==='cw4'?true:false;
+/* desenho do cavalo grande atrás */
+if(showHorse){
+const hcol=kd.col;
+ctx.globalAlpha=alpha*.55;
+ctx.fillStyle='#1a1418';
+ctx.beginPath();ctx.ellipse(0,80,46,22,0,0,TAU);ctx.fill();
+ctx.globalAlpha=alpha;
+ctx.fillStyle='#0c0a0d';
+/* corpo do cavalo */
+ctx.beginPath();ctx.ellipse(0,40,38,28,0,0,TAU);ctx.fill();
+/* pernas */
+for(const off of[-22,-7,7,22]){
+ctx.fillStyle='#0c0a0d';
+ctx.fillRect(off-4,40,8,52);
+ctx.fillStyle=hcol;ctx.globalAlpha=alpha*.4;
+ctx.fillRect(off-3,40,2,52);
+ctx.globalAlpha=alpha;
+}
+/* pescoço e cabeça do cavalo */
+ctx.fillStyle='#0c0a0d';
+ctx.beginPath();
+ctx.moveTo(28,15);ctx.quadraticCurveTo(50,2,52,-30);ctx.quadraticCurveTo(60,-44,52,-50);ctx.quadraticCurveTo(38,-46,30,-30);ctx.quadraticCurveTo(22,-12,28,15);
+ctx.closePath();ctx.fill();
+/* juba/crina */
+ctx.strokeStyle=hcol;ctx.lineWidth=4;ctx.lineCap='round';
+for(let i=0;i<6;i++){
+const a=-.6+i*.22;
+ctx.beginPath();ctx.moveTo(28+Math.cos(a)*22,-30+Math.sin(a)*22);ctx.lineTo(28+Math.cos(a)*32,-30+Math.sin(a)*32);ctx.stroke();
+}
+/* olhos vermelhos */
+ctx.fillStyle='#d9465a';
+ctx.beginPath();ctx.arc(44,-36,2,0,TAU);ctx.fill();
+ctx.beginPath();ctx.arc(52,-36,2,0,TAU);ctx.fill();
+}
+/* cavaleiro: armadura + capa */
+ctx.translate(0,-58);
+/* capa esvoaçante */
+ctx.fillStyle=kd.accent;ctx.globalAlpha=alpha*.7;
+ctx.beginPath();
+ctx.moveTo(-12,4);ctx.quadraticCurveTo(-34,32,-22,52);ctx.quadraticCurveTo(0,42,22,52);ctx.quadraticCurveTo(34,32,12,4);
+ctx.closePath();ctx.fill();
+ctx.globalAlpha=alpha;
+/* peitoral da armadura */
+ctx.fillStyle=kd.col;
+ctx.beginPath();ctx.moveTo(-16,-2);ctx.lineTo(16,-2);ctx.lineTo(14,32);ctx.lineTo(-14,32);ctx.closePath();ctx.fill();
+ctx.strokeStyle='#1a1418';ctx.lineWidth=2;ctx.stroke();
+/* detalhe central */
+ctx.fillStyle=kd.accent;
+ctx.beginPath();
+ctx.moveTo(0,-2);ctx.lineTo(4,8);ctx.lineTo(0,18);ctx.lineTo(-4,8);ctx.closePath();ctx.fill();
+/* ombros */
+for(const s of[-1,1]){
+ctx.fillStyle=kd.col;
+ctx.beginPath();ctx.arc(s*16,2,8,0,TAU);ctx.fill();
+ctx.stroke();
+}
+/* cabeça com elmo */
+ctx.fillStyle=kd.col;
+ctx.beginPath();ctx.arc(0,-22,12,0,TAU);ctx.fill();
+ctx.strokeStyle='#1a1418';ctx.lineWidth=2;ctx.stroke();
+/* viseira/fenda */
+ctx.fillStyle='#0c0a0d';
+ctx.fillRect(-8,-24,16,4);
+/* brilho dos olhos */
+ctx.fillStyle=kd.accent;
+ctx.beginPath();ctx.arc(-3,-23,1.5,0,TAU);ctx.fill();
+ctx.beginPath();ctx.arc(3,-23,1.5,0,TAU);ctx.fill();
+/* coroa (para o Branco) */
+if(type==='cw1'){
+ctx.fillStyle='#c9a44c';
+for(let i=0;i<5;i++){
+const a=-Math.PI/2+(i-2)*.35;
+const cx=Math.cos(a)*13,cy=-22+Math.sin(a)*13;
+ctx.beginPath();ctx.moveTo(cx-2,cy+4);ctx.lineTo(cx,cy-6);ctx.lineTo(cx+2,cy+4);ctx.closePath();ctx.fill();
+}
+ctx.fillRect(-13,-9,26,3);
+}
+/* balança (para o Preto) */
+if(type==='cw3'){
+ctx.strokeStyle=kd.accent;ctx.lineWidth=2;
+ctx.beginPath();ctx.moveTo(0,-12);ctx.lineTo(0,-22);ctx.stroke();
+ctx.beginPath();ctx.moveTo(-14,-14);ctx.lineTo(14,-14);ctx.stroke();
+for(const s of[-1,1]){
+ctx.beginPath();ctx.arc(s*14,-14,5,0,TAU);ctx.stroke();
+ctx.beginPath();ctx.arc(s*14,-14,5,0,Math.PI);ctx.stroke();
+}
+}
+/* arco (para o Branco) */
+if(type==='cw1'){
+ctx.strokeStyle=kd.accent;ctx.lineWidth=2;
+ctx.beginPath();ctx.arc(20,-22,18,-Math.PI*.7,-Math.PI*.3);ctx.stroke();
+}
+/* arma variante para os outros (vermelho = espada, preto = balança já feita, descorado = foice) */
+if(type==='cw2'){
+ctx.strokeStyle=kd.accent;ctx.lineWidth=3;
+ctx.beginPath();ctx.moveTo(18,-22);ctx.lineTo(36,-30);ctx.stroke();
+}
+if(type==='cw4'){
+/* foice curva */
+ctx.strokeStyle=kd.accent;ctx.lineWidth=3;
+ctx.beginPath();ctx.arc(28,-22,14,Math.PI*.4,Math.PI*1.2);ctx.stroke();
+}
+ctx.restore();
+}
+/* ============ IA dos Cavaleiros ============ */
+function cwKnightAI(e,dt,a,d,slowMul){
+e.stT+=dt;
+e.spawnT=Math.min(1,e.spawnT+dt*1.6);
+/* troca de fase quando cavalo cai */
+if(!e.p2&&e.horseHp<=0){
+e.p2=true;
+e.hp=Math.max(e.hp,e.maxHp*.35);
+const kd=KNIGHT_DATA[e.type];
+game.banner={type:'boss',txt:kd.name+' — FASE II',sub:'o cavalo tombou — o cavaleiro desce',t:0,dur:2.8};
+sfx.roar();sfx.howl();game.flash=.5;game.shake=22;
+sparks(e.x,e.y,kd.col,30,320,.9,4,true);
+sparks(e.x,e.y,kd.accent,18,260,.7,3.5,true);
+e.r*=1.05;e.sp*=1.3;
+/* troca para os padrões da fase 2 */
+if(e.type==='cw1')e.pats=CW1_P2.slice();
+if(e.type==='cw2')e.pats=CW2_P2.slice();
+if(e.type==='cw3')e.pats=CW3_P2.slice();
+if(e.type==='cw4')e.pats=CW4_P2.slice();
+e.patIdx=-1;
+}
+/* dano ao cavalo? se montado, o cavalo recebe parte do dano primeiro.
+isso já é tratado no updateBullets/exActUpdate verificando e.horseHp. */
+/* FLUTUAÇÃO no estado idle */
+if(e.st==='float'){
+const sp2=e.p2?1.4:1;
+if(d>380){e.x+=Math.cos(a)*e.sp*sp2*slowMul*dt;e.y+=Math.sin(a)*e.sp*sp2*slowMul*dt;}
+else if(d<240){e.x-=Math.cos(a)*e.sp*sp2*slowMul*dt;e.y-=Math.sin(a)*e.sp*sp2*slowMul*dt;}
+else{const pp=Math.sin(game.t*.7+e.seed);e.x+=-Math.sin(a)*e.sp*.7*pp*dt;e.y+=Math.cos(a)*e.sp*.7*pp*dt;}
+e.ang=lerpAngle(e.ang,a,1-Math.exp(-3*dt));
+e.atkT-=dt;
+if(e.atkT<=0){
+e.patIdx=(e.patIdx+1)%e.pats.length;e.pat=e.pats[e.patIdx];
+e.st='tele';e.stT=0;blip('sine',140,90,.3,.08);
+}
+}else if(e.st==='tele'){
+const teleDur=e.p2?.45:.65;
+if(e.stT>=teleDur){e.st=e.pat;e.stT=0;cwKnightStart(e);}
+}else cwKnightUpdate(e,dt);
+clampArena(e,e.r);
+if(!player.dead&&d<e.r+player.r-4)hurtPlayer();
+}
+/* ====== cwKnightStart: setup do padrão atual ====== */
+function cwKnightStart(e){
+const hard=game.hard,pp=player;
+const kd=KNIGHT_DATA[e.type];
+if(e.pat==='sword'){e.data={volleys:0,t:.1};e.recDur=.7;}
+else if(e.pat==='lance'){e.data={dashT:.6,dashA:Math.atan2(pp.y-e.y,pp.x-e.x),fired:false};e.recDur=.7;}
+else if(e.pat==='axe'){e.data={slams:0,t:.3};e.recDur=.8;}
+else if(e.pat==='bow'){e.data={arrows:0,t:.1};e.recDur=.7;}
+else if(e.pat==='charge'){e.data={charging:false,cdT:.4,dashed:false};e.recDur=.7;}
+else if(e.pat==='combo'){e.data={step:0,t:0};e.recDur=1.0;}
+else if(e.pat==='barrage'){e.data={volleys:0,t:.1};e.recDur=.8;}
+else if(e.pat==='cannons'){e.data={cannons:0,t:.3};e.recDur=.8;}
+else if(e.pat==='rain'){e.data={markT:0,salvos:0};e.recDur=1.0;}
+else if(e.pat==='zone'){e.data={marks:0,t:.2};e.recDur=.7;}
+else if(e.pat==='spread'){e.data={fired:false};e.recDur=.7;}
+else if(e.pat==='scale'){e.data={spin:0,t:0};e.recDur=.9;}
+else if(e.pat==='scarcity'){e.data={marks:0,t:.2};e.recDur=.7;}
+else if(e.pat==='devour'){e.data={phase:'windup',t:0};e.recDur=1.5;}
+else if(e.pat==='weight'){e.data={applied:false};e.recDur=.6;}
+else if(e.pat==='hunger'){e.data={fired:false};e.recDur=.7;}
+else if(e.pat==='plague'){e.data={marks:0,t:.1};e.recDur=1.0;}
+else if(e.pat==='chase'){e.data={dashT:.5,dashA:Math.atan2(pp.y-e.y,pp.x-e.x)};e.recDur=.7;}
+else if(e.pat==='wither'){e.data={rings:0,t:.2};e.recDur=.8;}
+else if(e.pat==='scythe'){e.data={arc:0,t:0};e.recDur=.7;}
+else if(e.pat==='pestilence'){e.data={clouds:0,t:.1};e.recDur=1.0;}
+/* Fase 2 padrões */
+else if(e.pat==='multiweapon'){e.data={step:0,t:0};e.recDur=1.2;}
+else if(e.pat==='whirl'){e.data={spin:0,t:0};e.recDur=1.0;}
+else if(e.pat==='arrowstorm'){e.data={arrows:0,t:.08};e.recDur=1.2;}
+else if(e.pat==='lunge'){e.data={jumps:0,t:.2,tele:false};e.recDur=1.0;}
+else if(e.pat==='armory'){e.data={spawned:0,t:.15};e.recDur=1.0;}
+else if(e.pat==='bombardment'){e.data={shots:0,t:.1};e.recDur=1.0;}
+else if(e.pat==='bulletstorm'){e.data={bursts:0,t:.2};e.recDur=1.2;}
+else if(e.pat==='carpet'){e.data={fired:false};e.recDur=1.0;}
+else if(e.pat==='absorb'){e.data={phase:'windup',t:0};e.recDur=2.0;}
+else if(e.pat==='mirror'){e.data={fired:false};e.recDur=1.0;}
+else if(e.pat==='empty'){e.data={marks:0,t:.2};e.recDur=.8;}
+else if(e.pat==='staving'){e.data={spin:0,t:0};e.recDur=1.0;}
+else if(e.pat==='blink'){e.data={jumps:0,tele:false,fired:false};e.recDur=1.0;}
+else if(e.pat==='falsecut'){e.data={fakes:0,fired:false};e.recDur=1.2;}
+else if(e.pat==='deathmark'){e.data={markT:0,fired:false};e.recDur=1.0;}
+else if(e.pat==='reaper'){e.data={arc:0,t:0};e.recDur=1.2;}
+e.actDur=0;e.data=e.data||{};
+}
+/* ====== cwKnightUpdate: executa o padrão atual ====== */
+function cwKnightUpdate(e,dt){
+const hard=game.hard,pp=player;
+const kd=KNIGHT_DATA[e.type];
+const col=kd.col,acc=kd.accent;
+const isP2=e.p2;
+/* cada padrão é executado em um branch. e.data carrega o estado. */
+if(e.pat==='sword'){
+e.data.t-=dt;
+const maxV=hard?4:3;
+if(e.data.t<=0&&e.data.volleys<maxV){
+e.data.volleys++;e.data.t=hard?.32:.4;
+const base=Math.atan2(pp.y-e.y,pp.x-e.x);
+const n=hard?6:4;
+for(let i=0;i<n;i++){
+const a=base+(i-(n-1)/2)*.18;
+ebullets.push({x:e.x,y:e.y,vx:Math.cos(a)*240,vy:Math.sin(a)*240,r:7,c:col});
+}
+/* slash arco */
+for(let k=0;k<3;k++){
+const a=base+Math.PI+(k-1)*.3;
+ebullets.push({x:e.x,y:e.y,vx:Math.cos(a)*180,vy:Math.sin(a)*180,r:5,c:acc});
+}
+sfx.spit();
+}
+if(e.data.volleys>=maxV&&e.stT>=1.0)cwKnightEnd(e);
+}
+else if(e.pat==='lance'){
+if(e.data.dashT>0){
+e.data.dashT-=dt;
+e.x+=Math.cos(e.data.dashA)*(hard?700:580)*dt;e.y+=Math.sin(e.data.dashA)*(hard?700:580)*dt;
+e.ang=e.data.dashA;
+particles.push({x:e.x,y:e.y,vx:0,vy:0,life:.25,t:0,r:8,c:col,alpha:.3,drag:0});
+if(!player.dead&&dist(e.x,e.y,pp.x,pp.y)<e.r+pp.r)hurtPlayer();
+clampArena(e,e.r);
+}else if(!e.data.fired){
+e.data.fired=true;
+/* lança detona em arco de estilhaços */
+const n=hard?10:7;
+for(let i=0;i<n;i++){
+const a=e.data.dashA+(i-(n-1)/2)*.16;
+ebullets.push({x:e.x,y:e.y,vx:Math.cos(a)*280,vy:Math.sin(a)*280,r:6,c:acc});
+}
+sfx.explode();
+}
+if(e.stT>=1.0)cwKnightEnd(e);
+}
+else if(e.pat==='axe'){
+e.data.t-=dt;
+const maxS=hard?3:2;
+if(e.data.t<=0&&e.data.slams<maxS){
+e.data.slams++;e.data.t=hard?.6:.8;
+/* machado arremessado em arco + onda de choque */
+const a=Math.atan2(pp.y-e.y,pp.x-e.x);
+ebullets.push({x:e.x,y:e.y,vx:Math.cos(a)*220,vy:Math.sin(a)*220,r:9,c:acc,boomerang:true,bx:e.x,by:e.y});
+rings.push({x:e.x,y:e.y,r:24,vr:hard?340:280,th:14,gapA:rnd(TAU),gapW:1.4,c:acc});
+sfx.thud();game.shake=Math.max(game.shake,7);
+}
+if(e.data.slams>=maxS&&e.stT>=1.0)cwKnightEnd(e);
+}
+else if(e.pat==='bow'){
+e.data.t-=dt;
+const maxA=hard?5:4;
+if(e.data.t<=0&&e.data.arrows<maxA){
+e.data.arrows++;e.data.t=hard?.18:.24;
+const a=Math.atan2(pp.y-e.y,pp.x-e.x)+rnd(-.08,.08);
+ebullets.push({x:e.x,y:e.y,vx:Math.cos(a)*(hard?440:380),vy:Math.sin(a)*(hard?440:380),r:5,c:acc,home:1.8,homeT:3});
+sfx.spit();
+}
+if(e.data.arrows>=maxA&&e.stT>=.7)cwKnightEnd(e);
+}
+else if(e.pat==='charge'){
+if(!e.data.charging&&e.data.cdT>0){e.data.cdT-=dt;}
+if(!e.data.charging&&e.data.cdT<=0){
+e.data.charging=true;e.data.dashT=.7;
+e.data.dashA=Math.atan2(pp.y-e.y,pp.x-e.x);
+sfx.dash();sfx.roar();game.shake=Math.max(game.shake,10);
+}
+if(e.data.charging){
+e.data.dashT-=dt;
+const v=hard?700:580;
+e.x+=Math.cos(e.data.dashA)*v*dt;e.y+=Math.sin(e.data.dashA)*v*dt;
+if(!player.dead&&dist(e.x,e.y,pp.x,pp.y)<e.r+pp.r+8){
+/* atropelamento do cavalo: dano forte */
+hurtPlayer();
+if(game.hard){
+/* no hard, segundo hit */
+e.data.dashA+=Math.PI;e.data.dashT=.3;
+}
+}
+particles.push({x:e.x+rnd(-10,10),y:e.y+rnd(-10,10),vx:rnd(-30,30),vy:rnd(-30,30),life:.3,t:0,r:5,c:'#3a2b2e',drag:1});
+clampArena(e,e.r);
+if(e.data.dashT<=0){e.data.charging=false;e.data.dashed=true;}
+}
+if(e.data.dashed&&e.stT>=.8)cwKnightEnd(e);
+}
+else if(e.pat==='combo'){
+e.data.t+=dt;
+if(e.data.step===0&&e.data.t>.15){
+e.data.step=1;
+/* investida em Z */
+const a=Math.atan2(pp.y-e.y,pp.x-e.x);
+for(let i=0;i<4;i++){
+const ang=a+(i-1.5)*.2;
+ebullets.push({x:e.x,y:e.y,vx:Math.cos(ang)*200,vy:Math.sin(ang)*200,r:5,c:col});
+}
+}
+if(e.data.step===1&&e.data.t>.6){
+e.data.step=2;
+/* rotação */
+const a=Math.atan2(pp.y-e.y,pp.x-e.x);
+for(let i=0;i<6;i++){
+const ang=i/6*TAU+a;
+ebullets.push({x:e.x,y:e.y,vx:Math.cos(ang)*220,vy:Math.sin(ang)*220,r:5,c:acc});
+}
+sfx.spit();
+}
+if(e.data.step===2&&e.data.t>1.0){
+e.data.step=3;
+/* golpe final pesado */
+rings.push({x:e.x,y:e.y,r:24,vr:hard?380:320,th:14,gapA:rnd(TAU),gapW:1.6,c:col});
+sfx.thud();game.shake=Math.max(game.shake,8);
+}
+if(e.data.step>=3&&e.stT>=1.2)cwKnightEnd(e);
+}
+else if(e.pat==='barrage'){
+e.data.t-=dt;
+const maxV=hard?5:4;
+if(e.data.t<=0&&e.data.volleys<maxV){
+e.data.volleys++;e.data.t=hard?.2:.26;
+const base=Math.atan2(pp.y-e.y,pp.x-e.x);
+const n=hard?8:6;
+for(let i=0;i<n;i++){
+const a=base+(i-(n-1)/2)*.12;
+ebullets.push({x:e.x,y:e.y,vx:Math.cos(a)*260,vy:Math.sin(a)*260,r:6,c:acc});
+}
+}
+if(e.data.volleys>=maxV&&e.stT>=1.0)cwKnightEnd(e);
+}
+else if(e.pat==='cannons'){
+e.data.t-=dt;
+const maxC=hard?4:3;
+if(e.data.t<=0&&e.data.cannons<maxC){
+e.data.cannons++;e.data.t=hard?.5:.6;
+/* 3 cannons disparam simultâneo do cavaleiro em angulo aleatório */
+const base=Math.atan2(pp.y-e.y,pp.x-e.x);
+for(let k=-1;k<=1;k++){
+const ba=base+k*.4;
+const sx=e.x+Math.cos(ba)*40,sy=e.y+Math.sin(ba)*40;
+for(let i=0;i<3;i++){
+const a=ba+(i-1)*.08;
+ebullets.push({x:sx,y:sy,vx:Math.cos(a)*230,vy:Math.sin(a)*230,r:7,c:acc});
+}
+sparks(sx,sy,acc,4,80,.3,2,true);
+}
+sfx.growl();
+}
+if(e.data.cannons>=maxC&&e.stT>=1.0)cwKnightEnd(e);
+}
+else if(e.pat==='rain'){
+e.data.markT-=dt;
+const maxS=hard?5:4;
+if(e.data.markT<=0&&e.data.salvos<maxS){
+e.data.salvos++;e.data.markT=hard?.4:.5;
+const n=hard?8:5;
+for(let i=0;i<n;i++){
+const a=rnd(TAU),dd=rnd(60,260);
+const pt=roomPt(pp.x+Math.cos(a)*dd,pp.y+Math.sin(a)*dd,50);
+geyserMarks.push({x:pt.x,y:pt.y,t:0,dur:hard?.55:.7,phase:'mark',c:acc});
+}
+geyserMarks.push({x:pp.x,y:pp.y,t:0,dur:.65,phase:'mark',c:col});
+blip('sawtooth',120,60,.25,.08);
+}
+if(e.data.salvos>=maxS&&e.stT>=1.2)cwKnightEnd(e);
+}
+else if(e.pat==='zone'){
+e.data.t-=dt;
+const maxM=hard?6:4;
+if(e.data.t<=0&&e.data.marks<maxM){
+e.data.marks++;e.data.t=hard?.4:.5;
+const a=rnd(TAU),dd=rnd(80,260);
+const pt=roomPt(e.x+Math.cos(a)*dd,e.y+Math.sin(a)*dd,50);
+ebullets.push({x:pt.x,y:pt.y,vx:0,vy:0,r:14,c:acc,mine:true,armT:.6,life:hard?8:6});
+}
+if(e.data.marks>=maxM&&e.stT>=.8)cwKnightEnd(e);
+}
+else if(e.pat==='spread'){
+if(!e.data.fired){
+e.data.fired=true;
+const n=hard?16:12;
+const off=rnd(TAU);
+for(let i=0;i<n;i++){
+const a=off+i/n*TAU;
+ebullets.push({x:e.x,y:e.y,vx:Math.cos(a)*230,vy:Math.sin(a)*230,r:6,c:col});
+}
+sfx.spit();sfx.growl();
+}
+if(e.stT>=.7)cwKnightEnd(e);
+}
+else if(e.pat==='scale'){
+e.data.t-=dt;
+if(e.data.t<=0){
+e.data.t=hard?.18:.22;
+e.data.spin+=.4;
+/* dois pratos da balança: dupla espiral cruzada */
+const arms=hard?4:3;
+for(let k=0;k<arms;k++){
+const a=e.data.spin+k*TAU/arms;
+ebullets.push({x:e.x,y:e.y,vx:Math.cos(a)*200,vy:Math.sin(a)*200,r:5,c:acc});
+const a2=-e.data.spin*1.3+k*TAU/arms;
+ebullets.push({x:e.x,y:e.y,vx:Math.cos(a2)*180,vy:Math.sin(a2)*180,r:5,c:col});
+}
+}
+if(e.stT>=1.0)cwKnightEnd(e);
+}
+else if(e.pat==='scarcity'){
+e.data.t-=dt;
+const maxM=hard?6:4;
+if(e.data.t<=0&&e.data.marks<maxM){
+e.data.marks++;e.data.t=hard?.4:.5;
+/* área onde recursos somem (simulado por marcas que explodem em silêncio) */
+const a=rnd(TAU),dd=rnd(80,300);
+const pt=roomPt(pp.x+Math.cos(a)*dd,pp.y+Math.sin(a)*dd,50);
+geyserMarks.push({x:pt.x,y:pt.y,t:0,dur:.8,phase:'mark',c:'#5a4a55',silent:true});
+}
+if(e.data.marks>=maxM&&e.stT>=.8)cwKnightEnd(e);
+}
+else if(e.pat==='devour'){
+e.data.t+=dt;
+if(e.data.phase==='windup'&&e.data.t>.6){
+e.data.phase='pull';e.data.t=0;
+sfx.howl();game.shake=Math.max(game.shake,8);
+sparks(e.x,e.y,acc,14,200,.4,4,true);
+}
+if(e.data.phase==='pull'){
+/* puxa jogador em direção ao cavaleiro */
+const dx=e.x-pp.x,dy=e.y-pp.y,D=Math.hypot(dx,dy)||1;
+pp.x+=dx/D*120*dt;pp.y+=dy/D*120*dt;
+clampArena(pp,pp.r);
+/* se chegar perto: engolido */
+if(D<50){
+e.data.phase='devoured';e.data.t=0;
+sfx.explode();game.flash=.5;game.shake=14;
+sparks(pp.x,pp.y,'#5a4a55',18,260,.5,4,true);
+}
+}
+if(e.data.phase==='devoured'){
+/* o cavaleiro fica parado por 1.5s "engolindo" — jogador teleporta para perto dele e fica imobilizado */
+if(e.data.t<1.5){
+pp.x=lerp(pp.x,e.x+60,1-Math.exp(-3*dt));
+pp.y=lerp(pp.y,e.y+60,1-Math.exp(-3*dt));
+/* copia um poder do Thor se tiver */
+if(e.data.t<.1){
+const powers=[];
+if(game.hasShot)powers.push('shot');
+if(game.hasBite)powers.push('bite');
+if(game.ymir)powers.push('ice');
+if(game.incendio)powers.push('fire');
+if(game.miasma)powers.push('poison');
+if(game.hasParry)powers.push('parry');
+if(powers.length){
+const taken=pick(powers);
+if(!e.copied)e.copied=[];
+if(e.copied.length<5)e.copied.push(taken);
+texts.push({x:pp.x,y:pp.y-30,txt:'FOME ABSORVEU: '+taken.toUpperCase(),t:0,life:1.4,c:'#7a5b8a',size:14,disp:true});
+}
+}
+}else{
+e.data.phase='release';e.data.t=0;
+/* cospe o jogador para longe */
+const ang=Math.atan2(pp.y-e.y,pp.x-e.x);
+pp.x=e.x+Math.cos(ang)*200;pp.y=e.y+Math.sin(ang)*200;
+sparks(pp.x,pp.y,'#5a4a55',12,200,.5,4,true);
+clampArena(pp,pp.r);
+sfx.spit();
+}
+}
+if(e.data.phase==='release'&&e.data.t>.4)cwKnightEnd(e);
+}
+else if(e.pat==='weight'){
+if(!e.data.applied){
+e.data.applied=true;
+/* aplica peso: Thor fica lento por 3s */
+pp.slowT=Math.max(pp.slowT,3);
+texts.push({x:pp.x,y:pp.y-30,txt:'SOB PESO',t:0,life:1,c:acc,size:14,disp:true});
+sparks(pp.x,pp.y,acc,8,150,.4,3,true);
+}
+if(e.stT>=.6)cwKnightEnd(e);
+}
+else if(e.pat==='hunger'){
+if(!e.data.fired){
+e.data.fired=true;
+const base=Math.atan2(pp.y-e.y,pp.x-e.x);
+const n=hard?10:7;
+for(let i=0;i<n;i++){
+const a=base+(i-(n-1)/2)*.18;
+ebullets.push({x:e.x,y:e.y,vx:Math.cos(a)*200,vy:Math.sin(a)*200,r:6,c:acc,home:1.6,homeT:4});
+}
+sfx.howl();
+}
+if(e.stT>=.7)cwKnightEnd(e);
+}
+else if(e.pat==='plague'){
+e.data.t-=dt;
+const maxM=hard?6:5;
+if(e.data.t<=0&&e.data.marks<maxM){
+e.data.marks++;e.data.t=hard?.3:.4;
+/* nuvens de peste que perseguem lentas */
+for(let i=0;i<2;i++){
+const a=rnd(TAU),dd=rnd(60,200);
+const pt=roomPt(e.x+Math.cos(a)*dd,e.y+Math.sin(a)*dd,50);
+ebullets.push({x:pt.x,y:pt.y,vx:0,vy:0,r:14,c:acc,mine:true,armT:.4,life:hard?10:7,plague:true});
+}
+}
+if(e.data.marks>=maxM&&e.stT>=1.2)cwKnightEnd(e);
+}
+else if(e.pat==='chase'){
+if(e.data.dashT>0){
+e.data.dashT-=dt;
+const v=hard?900:780;
+e.x+=Math.cos(e.data.dashA)*v*dt;e.y+=Math.sin(e.data.dashA)*v*dt;
+particles.push({x:e.x,y:e.y,vx:0,vy:0,life:.3,t:0,r:8,c:acc,alpha:.4,drag:0});
+/* hitkill visual: telegrafa com linha de aviso */
+if(!player.dead&&dist(e.x,e.y,pp.x,pp.y)<e.r+pp.r){
+/* HITKILL — mas o jogador viu o aviso antes */
+killPlayerInstant('INVESTIDA DA MORTE');
+}
+clampArena(e,e.r);
+}
+if(e.data.dashT<=0&&e.stT>=.7)cwKnightEnd(e);
+}
+else if(e.pat==='wither'){
+e.data.t-=dt;
+const maxR=hard?4:3;
+if(e.data.t<=0&&e.data.rings<maxR){
+e.data.rings++;e.data.t=hard?.5:.6;
+rings.push({x:e.x,y:e.y,r:24,vr:hard?340:280,th:14,gapA:rnd(TAU),gapW:1.1,c:acc,slow:true});
+sfx.howl();
+}
+if(e.data.rings>=maxR&&e.stT>=1.0)cwKnightEnd(e);
+}
+else if(e.pat==='scythe'){
+e.data.t+=dt;
+e.data.arc+=dt*4;
+/* foice girando: arco amplo de balas */
+if(Math.random()<dt*8){
+const a=e.data.arc;
+for(let i=0;i<5;i++){
+const aa=a+i*.16-Math.PI/4;
+ebullets.push({x:e.x,y:e.y,vx:Math.cos(aa)*220,vy:Math.sin(aa)*220,r:5,c:acc});
+}
+}
+if(e.stT>=.8)cwKnightEnd(e);
+}
+else if(e.pat==='pestilence'){
+e.data.t-=dt;
+const maxC=hard?6:4;
+if(e.data.t<=0&&e.data.clouds<maxC){
+e.data.clouds++;e.data.t=hard?.2:.3;
+const a=rnd(TAU),dd=rnd(40,260);
+const pt=roomPt(pp.x+Math.cos(a)*dd,pp.y+Math.sin(a)*dd,50);
+ebullets.push({x:pt.x,y:pt.y,vx:0,vy:0,r:18,c:acc,mine:true,armT:.5,life:hard?9:7});
+}
+if(e.data.clouds>=maxC&&e.stT>=1.2)cwKnightEnd(e);
+}
+/* ====== FASE 2 padrões ====== */
+else if(e.pat==='multiweapon'){
+/* usa várias armas simultaneamente */
+e.data.t+=dt;
+if(e.data.step===0&&e.data.t>.2){
+e.data.step=1;
+const a=Math.atan2(pp.y-e.y,pp.x-e.x);
+const n=hard?6:4;
+for(let i=0;i<n;i++){
+const aa=a+(i-(n-1)/2)*.18;
+ebullets.push({x:e.x,y:e.y,vx:Math.cos(aa)*250,vy:Math.sin(aa)*250,r:6,c:acc});
+}
+/* arco simultâneo */
+for(let i=0;i<3;i++){
+const aa=a+Math.PI+(i-1)*.2;
+ebullets.push({x:e.x,y:e.y,vx:Math.cos(aa)*220,vy:Math.sin(aa)*220,r:5,c:col});
+}
+}
+if(e.data.step===1&&e.data.t>.7){
+e.data.step=2;
+rings.push({x:e.x,y:e.y,r:24,vr:hard?380:320,th:14,gapA:rnd(TAU),gapW:1.4,c:col});
+sfx.thud();game.shake=Math.max(game.shake,8);
+}
+if(e.data.step>=2&&e.stT>=1.2)cwKnightEnd(e);
+}
+else if(e.pat==='whirl'){
+e.data.t-=dt;
+if(e.data.t<=0){
+e.data.t=hard?.07:.09;
+e.data.spin+=hard?.42:.36;
+const arms=hard?6:5;
+for(let k=0;k<arms;k++){
+const a=e.data.spin+k*TAU/arms;
+ebullets.push({x:e.x,y:e.y,vx:Math.cos(a)*230,vy:Math.sin(a)*230,r:6,c:col});
+const a2=-e.data.spin*1.2+k*TAU/arms;
+ebullets.push({x:e.x,y:e.y,vx:Math.cos(a2)*200,vy:Math.sin(a2)*200,r:5,c:acc});
+}
+}
+if(e.stT>=1.0)cwKnightEnd(e);
+}
+else if(e.pat==='arrowstorm'){
+e.data.t-=dt;
+const maxA=hard?14:10;
+if(e.data.t<=0&&e.data.arrows<maxA){
+e.data.arrows++;e.data.t=hard?.08:.1;
+const a=Math.atan2(pp.y-e.y,pp.x-e.x)+rnd(-.15,.15);
+ebullets.push({x:e.x,y:e.y,vx:Math.cos(a)*380,vy:Math.sin(a)*380,r:5,c:acc,home:1.4,homeT:2.5});
+}
+if(e.data.arrows>=maxA&&e.stT>=1.0)cwKnightEnd(e);
+}
+else if(e.pat==='lunge'){
+e.data.t+=dt;
+if(!e.data.tele&&e.data.t>.15){
+e.data.tele=true;
+const a=Math.atan2(pp.y-e.y,pp.x-e.x);
+e.data.tx=clamp(pp.x+Math.cos(a)*60,ROOM.x+60,ROOM.x+ROOM.w-60);
+e.data.ty=clamp(pp.y+Math.sin(a)*60,ROOM.y+60,ROOM.y+ROOM.h-60);
+sparks(e.x,e.y,col,8,160,.4,3);
+}
+if(e.data.tele&&e.data.t>.6&&!e.data.jumped){
+e.data.jumped=true;
+e.x=e.data.tx;e.y=e.data.ty;
+sparks(e.x,e.y,acc,14,220,.5,3,true);
+sfx.thud();game.shake=Math.max(game.shake,8);
+const n=hard?12:8;
+for(let i=0;i<n;i++){
+const a=i/n*TAU;
+ebullets.push({x:e.x,y:e.y,vx:Math.cos(a)*220,vy:Math.sin(a)*220,r:6,c:col});
+}
+}
+if(e.data.jumped&&e.data.t>1.0)cwKnightEnd(e);
+}
+else if(e.pat==='armory'){
+e.data.t-=dt;
+const maxS=hard?8:5;
+if(e.data.t<=0&&e.data.spawned<maxS){
+e.data.spawned++;e.data.t=hard?.15:.2;
+const a=rnd(TAU),dd=rnd(60,200);
+const pt=roomPt(e.x+Math.cos(a)*dd,e.y+Math.sin(a)*dd,50);
+ebullets.push({x:pt.x,y:pt.y,vx:0,vy:0,r:14,c:acc,mine:true,armT:.4,life:hard?8:6});
+}
+if(e.data.spawned>=maxS&&e.stT>=1.0)cwKnightEnd(e);
+}
+else if(e.pat==='bombardment'){
+e.data.t-=dt;
+const maxS=hard?12:8;
+if(e.data.t<=0&&e.data.shots<maxS){
+e.data.shots++;e.data.t=hard?.08:.1;
+const a=Math.atan2(pp.y-e.y,pp.x-e.x)+rnd(-.2,.2);
+ebullets.push({x:e.x,y:e.y,vx:Math.cos(a)*280,vy:Math.sin(a)*280,r:6,c:acc});
+}
+if(e.data.shots>=maxS&&e.stT>=1.0)cwKnightEnd(e);
+}
+else if(e.pat==='bulletstorm'){
+e.data.t-=dt;
+const maxB=hard?5:3;
+if(e.data.t<=0&&e.data.bursts<maxB){
+e.data.bursts++;e.data.t=hard?.25:.3;
+const n=hard?14:10;
+const off=rnd(TAU);
+for(let i=0;i<n;i++){
+const a=off+i/n*TAU;
+ebullets.push({x:e.x,y:e.y,vx:Math.cos(a)*240,vy:Math.sin(a)*240,r:6,c:col});
+}
+sfx.spit();sfx.growl();
+}
+if(e.data.bursts>=maxB&&e.stT>=1.2)cwKnightEnd(e);
+}
+else if(e.pat==='carpet'){
+if(!e.data.fired){
+e.data.fired=true;
+/* chuva pesada cobrindo metade da tela */
+const n=hard?20:14;
+const dir=Math.random()<.5;
+for(let i=0;i<n;i++){
+const x=dir?ROOM.x+rnd(0,ROOM.w*.5):ROOM.x+ROOM.w*.5+rnd(0,ROOM.w*.5);
+const y=ROOM.y-30;
+const a=Math.PI/2+rnd(-.15,.15);
+ebullets.push({x:x,y:y,vx:Math.cos(a)*220,vy:Math.sin(a)*220,r:6,c:acc});
+}
+sfx.howl();game.shake=Math.max(game.shake,8);
+}
+if(e.stT>=1.0)cwKnightEnd(e);
+}
+else if(e.pat==='absorb'){
+e.data.t+=dt;
+if(e.data.phase==='windup'&&e.data.t>.5){
+e.data.phase='pull';e.data.t=0;
+sfx.howl();game.shake=Math.max(game.shake,8);
+}
+if(e.data.phase==='pull'){
+const dx=e.x-pp.x,dy=e.y-pp.y,D=Math.hypot(dx,dy)||1;
+pp.x+=dx/D*180*dt;pp.y+=dy/D*180*dt;
+clampArena(pp,pp.r);
+if(D<40){
+e.data.phase='absorbed';e.data.t=0;
+sfx.explode();game.flash=.6;game.shake=18;
+sparks(pp.x,pp.y,acc,18,260,.5,4,true);
+}
+}
+if(e.data.phase==='absorbed'&&e.data.t<2.0){
+pp.x=lerp(pp.x,e.x+50,1-Math.exp(-4*dt));
+pp.y=lerp(pp.y,e.y+50,1-Math.exp(-4*dt));
+if(e.data.t<.1){
+/* absorve TODOS os elementos atuais do Thor de uma vez */
+if(game.hasShot)e.copied=e.copied||[];if(game.hasShot&&!e.copied.includes('shot'))e.copied.push('shot');
+if(game.hasBite&&!e.copied.includes('bite'))e.copied.push('bite');
+if(game.ymir&&!e.copied.includes('ice'))e.copied.push('ice');
+if(game.incendio&&!e.copied.includes('fire'))e.copied.push('fire');
+if(game.miasma&&!e.copied.includes('poison'))e.copied.push('poison');
+texts.push({x:pp.x,y:pp.y-30,txt:'FOME ABSORVEU TUDO',t:0,life:1.6,c:'#7a5b8a',size:16,disp:true});
+}
+}else if(e.data.phase==='absorbed'&&e.data.t>=2.0){
+e.data.phase='release';e.data.t=0;
+const ang=Math.atan2(pp.y-e.y,pp.x-e.x);
+pp.x=e.x+Math.cos(ang)*250;pp.y=e.y+Math.sin(ang)*250;
+clampArena(pp,pp.r);
+sfx.spit();
+}
+if(e.data.phase==='release'&&e.data.t>.4)cwKnightEnd(e);
+}
+else if(e.pat==='mirror'){
+if(!e.data.fired){
+e.data.fired=true;
+/* usa poderes copiados em rajada — atira projéteis que parecem tiros do Thor */
+const n=hard?14:10;
+const off=rnd(TAU);
+for(let i=0;i<n;i++){
+const a=off+i/n*TAU;
+/* cor mímica do tiro do cão (#cfe9ff) */
+ebullets.push({x:e.x,y:e.y,vx:Math.cos(a)*230,vy:Math.sin(a)*230,r:5,c:'#cfe9ff'});
+}
+sfx.shotS();sfx.spit();
+/* se copiou mordida: também detona em área */
+if(e.copied&&e.copied.includes('bite')){
+rings.push({x:e.x,y:e.y,r:30,vr:hard?380:320,th:14,gapA:rnd(TAU),gapW:1.4,c:'#d9465a'});
+sfx.bite();
+}
+}
+if(e.stT>=1.0)cwKnightEnd(e);
+}
+else if(e.pat==='empty'){
+e.data.t-=dt;
+const maxM=hard?6:4;
+if(e.data.t<=0&&e.data.marks<maxM){
+e.data.marks++;e.data.t=hard?.3:.4;
+const a=rnd(TAU),dd=rnd(80,260);
+const pt=roomPt(pp.x+Math.cos(a)*dd,pp.y+Math.sin(a)*dd,50);
+/* vazio: marca que explode em silêncio e devora almas próximas */
+geyserMarks.push({x:pt.x,y:pt.y,t:0,dur:.8,phase:'mark',c:'#5a4a55',silent:true});
+}
+if(e.data.marks>=maxM&&e.stT>=.8)cwKnightEnd(e);
+}
+else if(e.pat==='staving'){
+e.data.t-=dt;
+if(e.data.t<=0){
+e.data.t=hard?.1:.13;
+e.data.spin+=hard?.42:.36;
+const arms=hard?7:5;
+for(let k=0;k<arms;k++){
+const a=e.data.spin+k*TAU/arms;
+ebullets.push({x:e.x,y:e.y,vx:Math.cos(a)*200,vy:Math.sin(a)*200,r:6,c:acc});
+const a2=a+Math.PI;
+ebullets.push({x:e.x,y:e.y,vx:Math.cos(a2)*180,vy:Math.sin(a2)*180,r:5,c:col});
+}
+}
+if(e.stT>=1.0)cwKnightEnd(e);
+}
+else if(e.pat==='blink'){
+e.data.t+=dt;
+if(!e.data.tele&&e.data.t>.2){
+e.data.tele=true;
+sparks(e.x,e.y,col,10,180,.4,4);
+const a=rnd(TAU),dd=rnd(120,200);
+const pt=roomPt(pp.x+Math.cos(a)*dd,pp.y+Math.sin(a)*dd,50);
+e.data.tx=pt.x;e.data.ty=pt.y;
+}
+if(e.data.tele&&e.data.t>.55&&!e.data.fired){
+e.data.fired=true;
+e.x=e.data.tx;e.y=e.data.ty;
+sparks(e.x,e.y,acc,16,260,.5,4,true);
+sfx.thud();game.shake=Math.max(game.shake,10);
+const n=hard?16:12;
+for(let i=0;i<n;i++){
+const a=i/n*TAU;
+ebullets.push({x:e.x,y:e.y,vx:Math.cos(a)*230,vy:Math.sin(a)*230,r:6,c:acc});
+}
+}
+if(e.data.fired&&e.data.t>1.0){e.data.jumps++;if(e.data.jumps<(hard?3:2)){e.data.tele=false;e.data.fired=false;e.data.t=0;}else cwKnightEnd(e);}
+}
+else if(e.pat==='falsecut'){
+e.data.t+=dt;
+if(!e.data.fakes){e.data.fakes=0;}
+if(e.data.t>.3&&e.data.fakes<2&&!e.data.fired){
+e.data.fakes++;
+e.data.t=0;
+/* finta: 50% chance de disparar falso (sem dano) */
+if(Math.random()<.5){
+const a=Math.atan2(pp.y-e.y,pp.x-e.x);
+const n=4;
+for(let i=0;i<n;i++){
+const aa=a+(i-(n-1)/2)*.18;
+ebullets.push({x:e.x,y:e.y,vx:Math.cos(aa)*220,vy:Math.sin(aa)*220,r:5,c:'#5e5036',fake:true});
+}
+sfx.spit();
+}else{
+/* golpe real */
+const a=Math.atan2(pp.y-e.y,pp.x-e.x);
+const n=hard?6:4;
+for(let i=0;i<n;i++){
+const aa=a+(i-(n-1)/2)*.14;
+ebullets.push({x:e.x,y:e.y,vx:Math.cos(aa)*280,vy:Math.sin(aa)*280,r:6,c:acc});
+}
+sfx.growl();
+}
+}
+if(e.data.fakes>=2&&e.stT>=1.2)cwKnightEnd(e);
+}
+else if(e.pat==='deathmark'){
+/* HITKILL telegrafado: marca o chão, depois explode em linha mortal */
+if(!e.data.fired){
+e.data.markT+=dt;
+if(e.data.markT<.6){
+/* linha telegrafada do cavaleiro até o jogador */
+const a=Math.atan2(pp.y-e.y,pp.x-e.x);
+ctx.save();
+ctx.setLineDash([10,8]);
+ctx.strokeStyle='rgba(201,164,76,'+(.5+.3*Math.sin(game.t*18))+')';
+ctx.lineWidth=4;
+ctx.beginPath();ctx.moveTo(e.x,e.y);
+ctx.lineTo(e.x+Math.cos(a)*1200,e.y+Math.sin(a)*1200);
+ctx.stroke();ctx.setLineDash([]);
+ctx.restore();
+}else{
+e.data.fired=true;
+const a=Math.atan2(pp.y-e.y,pp.x-e.x);
+/* HITKILL — aviso claro dado acima */
+const L=1400;
+const ex2=e.x+Math.cos(a)*L,ey2=e.y+Math.sin(a)*L;
+if(!player.dead&&segDist(pp.x,pp.y,e.x,e.y,ex2,ey2)<24+pp.r){
+killPlayerInstant('MARCA DA MORTE');
+}
+/* efeito visual */
+for(let i=0;i<8;i++){
+const t=i/8;
+const px=lerp(e.x,ex2,t),py=lerp(e.y,ey2,t);
+sparks(px,py,acc,5,160,.4,3,true);
+}
+sfx.explode();game.shake=Math.max(game.shake,10);
+}
+}
+if(e.data.fired&&e.stT>=1.0)cwKnightEnd(e);
+}
+else if(e.pat==='reaper'){
+e.data.t+=dt;
+e.data.arc+=dt*5;
+if(Math.random()<dt*12){
+const a=e.data.arc;
+for(let i=0;i<6;i++){
+const aa=a+i*.2-Math.PI/3;
+ebullets.push({x:e.x,y:e.y,vx:Math.cos(aa)*240,vy:Math.sin(aa)*240,r:5,c:acc});
+}
+}
+if(e.stT>=1.2)cwKnightEnd(e);
+}
+}
+function cwKnightEnd(e){
+e.st='float';e.stT=0;e.atkT=(game.hard?.7:1.1)+rnd(.4);
+}
+/* Triunfo: Última Conquista do Cavaleiro Branco.
+   Por 60s, ambos ficam imortais e os golpes do cavaleiro hitkillam.
+   Corações caem pelo campo — o jogador precisa coletar todos. */
+function startConquestTriumph(e){
+e.triunfo=true;e.triumphT=60;e.invuln=true;game.knightInvuln=true;
+game.knightHearts=[];game.knightHeartsCollected=0;
+game.knightHeartsNeeded=8;
+game.banner={type:'boss',txt:'TRIUNFO — ÚLTIMA CONQUISTA',sub:'cavaleiro e cão imortais. colete os corações!',t:0,dur:3.6};
+sfx.levelup();sfx.roar();game.flash=.6;game.shake=22;
+}
+function updateConquestTriumph(dt,e){
+e.triumphT-=dt;
+/* dropa um coração a cada ~4s */
+if(Math.random()<dt*.25){
+const a=rnd(TAU),dd=rnd(80,260);
+const pt=roomPt(e.x+Math.cos(a)*dd,e.y+Math.sin(a)*dd,40);
+game.knightHearts.push({x:pt.x,y:pt.y,t:0,life:12});
+}
+/* coleta */
+game.knightHearts=game.knightHearts.filter(h=>{
+const d=dist(player.x,player.y,h.x,h.y);
+if(d<40){
+game.knightHeartsCollected++;
+sparks(player.x,player.y,'#ffd9a0',10,200,.5,3,true);
+sfx.heart();
+return false;
+}
+h.t+=dt;
+return h.t<h.life;
+});
+/* se coletou todos: cavaleiro morre */
+if(game.knightHeartsCollected>=game.knightHeartsNeeded){
+e.invuln=false;
+e.hp=1;
+e.triunfo=false;game.knightInvuln=false;
+texts.push({x:e.x,y:e.y-60,txt:'CONQUISTA COMPLETA',t:0,life:2,c:'#ffd9a0',size:18,disp:true});
+}
+if(e.triumphT<=0){
+/* tempo acabou — jogador perde a luta mas não é game over comum */
+e.invuln=false;
+e.hp=Math.max(e.hp,e.maxHp*.15);
+e.triunfo=false;game.knightInvuln=false;
+game.flash=.5;
+texts.push({x:e.x,y:e.y-60,txt:'O TEMPO ESGOTOU',t:0,life:2,c:'#d9465a',size:18,disp:true});
+}
+}
+/* Triunfo: Guerra Sem Fim do Cavaleiro Vermelho.
+   Arena chove armas por 45s — sobreviver + quebrar as armas (5 spawns). */
+function startWarTriumph(e){
+e.triunfo=true;e.triumphT=45;e.invuln=true;game.knightInvuln=true;
+game.knightHearts=[];game.knightHeartsCollected=0;
+game.knightHeartsNeeded=5;
+game.banner={type:'boss',txt:'TRIUNFO — GUERRA SEM FIM',sub:'armas chovem. destrua as 5 armas invocadas!',t:0,dur:3.6};
+sfx.levelup();sfx.roar();game.flash=.6;game.shake=22;
+}
+function updateWarTriumph(dt,e){
+e.triumphT-=dt;
+if(Math.random()<dt*1.2){
+/* invoca "arma" — marcador que vira inimigo frágil que precisa ser destruído */
+const a=rnd(TAU),dd=rnd(80,260);
+const pt=roomPt(e.x+Math.cos(a)*dd,e.y+Math.sin(a)*dd,40);
+/* representado como um ebullet-mine que precisa ser "destruído" pelo jogador */
+ebullets.push({x:pt.x,y:pt.y,vx:0,vy:0,r:18,c:'#d9465a',mine:true,armT:0,life:8,triumphWeapon:true,hp:5});
+}
+/* conta quantas armas o jogador já destruiu (ao acertar um ebullet com triumphWeapon) */
+/* incrementado em updateBullets quando acertado */
+if(game.knightHeartsCollected>=game.knightHeartsNeeded){
+e.invuln=false;e.hp=1;e.triunfo=false;game.knightInvuln=false;
+texts.push({x:e.x,y:e.y-60,txt:'GUERRA VENCIDA',t:0,life:2,c:'#ffd9a0',size:18,disp:true});
+}
+if(e.triumphT<=0){
+e.invuln=false;e.hp=Math.max(e.hp,e.maxHp*.15);e.triunfo=false;game.knightInvuln=false;
+texts.push({x:e.x,y:e.y-60,txt:'A GUERRA NÃO TERMINOU',t:0,life:2,c:'#d9465a',size:18,disp:true});
+}
+}
+/* Triunfo: Banquete do Fim do Cavaleiro Preto.
+   A arena vai encolhendo por 30s — sobreviver + durar até o fim. */
+function startFamineTriumph(e){
+e.triunfo=true;e.triumphT=30;e.invuln=true;game.knightInvuln=true;
+game.knightHearts=[];game.knightHeartsCollected=0;
+game.knightHeartsNeeded=1;
+game.banner={type:'boss',txt:'TRIUNFO — BANQUETE DO FIM',sub:'a arena é devorada. sobreviva até o fim.',t:0,dur:3.6};
+sfx.levelup();sfx.roar();game.flash=.6;game.shake=22;
+}
+function updateFamineTriumph(dt,e){
+e.triumphT-=dt;
+/* efeito visual: a arena encolhe — represented by removing decorativos */
+if(Math.random()<dt*8){
+particles.push({x:rnd(W),y:rnd(H),vx:0,vy:0,life:.4,t:0,r:rnd(20,60),c:'#5a4a55',alpha:.3,drag:1});
+}
+/* atira projéteis em direção ao centro */
+if(Math.random()<dt*4){
+const a=rnd(TAU);
+ebullets.push({x:e.x+Math.cos(a)*200,y:e.y+Math.sin(a)*200,vx:-Math.cos(a)*120,vy:-Math.sin(a)*120,r:6,c:'#7a5b8a'});
+}
+if(e.triumphT<=0){
+/* sobreviveu — o banquete termina */
+e.invuln=false;e.hp=1;e.triunfo=false;game.knightInvuln=false;
+game.knightHeartsCollected=1;
+texts.push({x:e.x,y:e.y-60,txt:'A FOME SE CURVOU',t:0,life:2,c:'#ffd9a0',size:18,disp:true});
+}
+}
+/* Triunfo: O Fim do Cavaleiro Descorado.
+   25s de batalha com hitkill absoluto em ambos os lados.
+   Condição: causar 3 "marcas" (acertar o cavaleiro 3x com qualquer arma). */
+function startDeathTriumph(e){
+e.triunfo=true;e.triumphT=25;e.invuln=true;e.triumphHits=0;game.knightInvuln=true;
+game.knightHeartsNeeded=3;game.knightHeartsCollected=0;
+game.banner={type:'boss',txt:'TRIUNFO — O FIM',sub:'silêncio. cada golpe mata. acerte-o 3x.',t:0,dur:3.6};
+sfx.levelup();sfx.echo();game.flash=.5;game.shake=14;
+/* silêncio visual: zera decoração e penumbra brevemente */
+}
+function updateDeathTriumph(dt,e){
+e.triumphT-=dt;
+/* o cavaleiro se teleporta e atira — o jogador precisa acertar 3x */
+if(Math.random()<dt*2){
+const a=rnd(TAU),dd=rnd(150,300);
+const pt=roomPt(e.x+Math.cos(a)*dd,e.y+Math.sin(a)*dd,50);
+sparks(e.x,e.y,'#c9a44c',10,200,.4,3,true);
+e.x=pt.x;e.y=pt.y;
+sparks(e.x,e.y,'#5e5036',14,240,.5,4,true);
+sfx.thud();
+}
+/* atira foice mortal */
+if(Math.random()<dt*3){
+const a=Math.atan2(player.y-e.y,player.x-e.x);
+ebullets.push({x:e.x,y:e.y,vx:Math.cos(a)*380,vy:Math.sin(a)*380,r:8,c:'#c9a44c',hitkill:true});
+}
+/* o contador de hits é incrementado em updateBullets ao acertar o cavaleiro */
+if(game.knightHeartsCollected>=game.knightHeartsNeeded){
+e.invuln=false;e.hp=1;e.triunfo=false;game.knightInvuln=false;
+texts.push({x:e.x,y:e.y-60,txt:'A MORTE MORREU',t:0,life:2,c:'#ffd9a0',size:18,disp:true});
+}
+if(e.triumphT<=0){
+e.invuln=false;e.hp=Math.max(e.hp,e.maxHp*.15);e.triunfo=false;game.knightInvuln=false;
+texts.push({x:e.x,y:e.y-60,txt:'O FIM NÃO VEIO',t:0,life:2,c:'#d9465a',size:18,disp:true});
+}
+}
+/* handler genérico: ativa triunfo quando HP < 12% e ainda não ativou */
+function cwCheckTriumph(e){
+if(e.triunfo)return;
+if(e.hp>Math.max(1,e.maxHp*.12))return;
+if(e.type==='cw1')startConquestTriumph(e);
+else if(e.type==='cw2')startWarTriumph(e);
+else if(e.type==='cw3')startFamineTriumph(e);
+else if(e.type==='cw4')startDeathTriumph(e);
+}
+/* atualiza o triunfo ativo do cavaleiro */
+function updateKnightTriumph(dt,e){
+if(!e.triunfo)return;
+if(e.type==='cw1')updateConquestTriumph(dt,e);
+else if(e.type==='cw2')updateWarTriumph(dt,e);
+else if(e.type==='cw3')updateFamineTriumph(dt,e);
+else if(e.type==='cw4')updateDeathTriumph(dt,e);
+}
+/* checa e ativa o triunfo a cada update */
+function knightAny2(){return enemies.find(e=>['cw1','cw2','cw3','cw4'].includes(e.type)&&!e.dead);}
+/* ====== desenho do cavaleiro no campo (chamado de drawEnemy) ====== */
+function drawKnight(e){
+const s=Math.min(1,e.spawnT);
+ctx.fillStyle='rgba(0,0,0,0.3)';
+ctx.beginPath();ctx.ellipse(e.x,e.y+e.r*.55,e.r*s,e.r*.4*s,0,0,TAU);ctx.fill();
+ctx.save();
+ctx.translate(e.x,e.y);ctx.scale(s,s);ctx.translate(-e.x,-e.y);
+const kd=KNIGHT_DATA[e.type];
+ctx.globalAlpha=.15+.1*Math.sin(game.t*3+e.seed);
+ctx.fillStyle=kd.col;
+ctx.beginPath();ctx.arc(e.x,e.y,e.r+22,0,TAU);ctx.fill();
+ctx.globalAlpha=1;
+ctx.translate(0,0);
+drawKnightBody(e.type,e.x,e.y,e.r,1);
+/* aura de triunfo ativo */
+if(e.triunfo){
+ctx.globalAlpha=.3+.2*Math.sin(game.t*5);
+ctx.strokeStyle=kd.accent;ctx.lineWidth=4;
+ctx.beginPath();ctx.arc(e.x,e.y,e.r+34,0,TAU);ctx.stroke();
+ctx.globalAlpha=1;
+/* anel rotativo interno */
+ctx.save();ctx.translate(e.x,e.y);ctx.rotate(game.t*2);
+ctx.strokeStyle=kd.accent;ctx.lineWidth=2;
+for(let k=0;k<6;k++){
+const a=k/6*TAU;
+ctx.beginPath();
+ctx.moveTo(Math.cos(a)*(e.r+24),Math.sin(a)*(e.r+24));
+ctx.lineTo(Math.cos(a)*(e.r+34),Math.sin(a)*(e.r+34));
+ctx.stroke();
+}
+ctx.restore();
+}
+/* telegrafia do ataque (assina visual) */
+if(e.st==='tele'){
+const sk=sigKeyForKnight(e);
+const dur=e.p2?.45:.65;
+const prog=clamp(e.stT/dur,0,1);
+drawAttackSig(e.x,e.y,e.r+22,sk,prog,kd.accent);
+}
+/* HP flutuante: barra extra do cavalo se ainda montado */
+if(e.flash>0){
+ctx.fillStyle='rgba(255,240,210,'+Math.min(.85,e.flash*7)+')';
+ctx.beginPath();ctx.arc(e.x,e.y,e.r+10,0,TAU);ctx.fill();
+}
+ctx.restore();
+}
+/* mapeia padrões dos cavaleiros para chaves em ATTACK_SIG (algumas colidem) */
+function sigKeyForKnight(e){
+const t=e.type,p=e.pat;
+if(t==='cw1'){
+if(p==='charge')return'cw_charge';
+if(p==='combo')return'cw_combo';
+return'cw_'+p;
+}
+if(t==='cw2'){
+if(p==='charge')return'cw_charge';
+return'cw2_'+p;
+}
+if(t==='cw3'){
+if(p==='charge')return'cw_charge';
+return'cw3_'+p;
+}
+if(t==='cw4'){
+if(p==='chase')return'cw4_chase';
+return'cw4_'+p;
+}
+return p;
+}
+/* ===== drops exclusivos (reliquias) ===== */
+const KNIGHT_DROPS=[
+{id:'knight_conquest',name:'COROA DO CONQUISTADOR',desc:'-15% velocidade · +50% dano · o cone de mordida fica 30% maior e cada mordida rejeita 1 projetil do inimigo',chk:m=>m.knights&&m.knights.conquest>=1,apply(){P.dmgMult*=1.5;P.speedMult*=.85;P.biteRange*=1.3;game.knightConquest=true;}},
+{id:'knight_war',name:'ARSENAL DE GUERRA',desc:'+60% dano de projéteis · -25% velocidade de tiro · invoca uma serra orbital a cada 12s',chk:m=>m.knights&&m.knights.war>=1,apply(){P.dmgMult*=1.6;P.rateMult*=.75;game.knightWar=true;}},
+{id:'knight_famine',name:'BALANÇA VAZIA',desc:'+30% dano · -25% magnetismo de almas · mordida tem 25% de roubar 1 alma extra do inimigo',chk:m=>m.knights&&m.knights.famine>=1,apply(){P.dmgMult*=1.3;P.magnetMult*=.75;game.knightFamine=true;}},
+{id:'knight_death',name:'FOICE DO FIM',desc:'+100% dano · -1 coração máximo · a cada 8s, um golpe de perto executa inimigos com <30% HP',chk:m=>m.knights&&m.knights.death>=1,apply(){P.dmgMult*=2;player.maxHp=Math.max(2,player.maxHp-1);if(player.hp>player.maxHp)player.hp=player.maxHp;game.knightDeath=true;game.knightDeathT=0;}},
+{id:'apocalypse',name:'SELO DO APOCALIPSE',desc:'+50% de tudo (dano, velocidade, taxa de tiro, magnetismo) · -1 coração máximo · você superou os 4 Cavaleiros',chk:m=>m.knights&&m.knights.conquest>=1&&m.knights.war>=1&&m.knights.famine>=1&&m.knights.death>=1,apply(){P.dmgMult*=1.5;P.speedMult*=1.5;P.rateMult*=1.5;P.magnetMult*=1.5;player.maxHp=Math.max(2,player.maxHp-1);if(player.hp>player.maxHp)player.hp=player.maxHp;game.apocalypse=true;}}
+];
 /* ============ puzzle, janela e cena da janela ============ */
 function updatePuzzle(dt){
  const pz=game.puzzle;
@@ -4562,7 +5929,21 @@ function updateEBullets(dt){
 const vmul=game.hard?1.22:1;
 for(let i=ebullets.length-1;i>=0;i--){
 const b=ebullets[i];
+/* tiro mortal do Triunfo da Morte */
+if(b.hitkill&&!b.fake&&!player.dead&&dist(b.x,b.y,player.x,player.y)<b.r+player.r){
+killPlayerInstant('FOICE DO FIM');
+}
 if(b.mine){
+/* armas do Triunfo da Guerra: contam como 1 hit para a condição */
+if(b.triumphWeapon){
+b.life-=dt;
+if(b.life<=0){
+if(game.knightHeartsCollected<game.knightHeartsNeeded)game.knightHeartsCollected++;
+sparks(b.x,b.y,b.c,12,200,.5,3,true);
+ebullets.splice(i,1);
+}
+continue;
+}
 b.armT-=dt;b.life-=dt;
 if(b.life<=0){sparks(b.x,b.y,b.c,3,60,.3,2);ebullets.splice(i,1);continue;}
 if(b.armT<=0&&!b.fake&&!player.dead&&dist(b.x,b.y,player.x,player.y)<b.r+34+player.r){
@@ -4734,6 +6115,23 @@ sfx.levelup();sfx.howl();
 sparks(p.x,p.y,'#ffd9a0',26,300,.9,4,true);
 sparks(p.x,p.y,'#d8cfc0',14,220,.7,3,true);
 game.banner={type:'circle',txt:'ITEM ÚNICO',name:'ALMA DO REI ANTIGO',sub:'+1 coração · +25% de dano · o rei joga por você',t:0,dur:3.4};
+continue;
+}
+}else if(p.type==='knightrelic'&&!player.dead){
+if(dist(p.x,p.y,player.x,player.y)<40){
+pickups.splice(i,1);
+const def=KNIGHT_DROPS.find(d=>d.id===p.relicId);
+if(def){
+META.done[def.id]=1;saveMeta();
+if(def.apply)def.apply();
+game.flash=.7;game.shake=18;sfx.levelup();sfx.roar();
+sparks(player.x,player.y,p.relicColor||'#ffd9a0',30,300,.9,4,true);
+sparks(player.x,player.y,p.relicGlow||'#d9465a',18,260,.7,3.5,true);
+game.banner={type:'circle',txt:'RELÍQUIA DO CAVALEIRO',name:def.name,sub:def.desc,t:0,dur:4};
+}else{
+/* fallback — coração cheio + almas */
+player.hp=player.maxHp;gainSouls(50);
+}
 continue;
 }
 }
@@ -4922,7 +6320,8 @@ blurActive();
 /* ============ sala de testes (PENUMBRA) ============ */
 const LAB_ITEMS=[
 {id:'mb',n:'O BRUXO'},{id:'ex',n:'O CARRASCO'},{id:'vi',n:'A VIÚVA'},{id:'gz',n:'O GOLEM'},
-{id:'rk',n:'O VELHO REI'},{id:'e404',n:'ERRO 404'},{id:'boss',n:'O CÉRBERO'},{id:'puzzle',n:'PUZZLE NOVO'}];
+{id:'rk',n:'O VELHO REI'},{id:'e404',n:'ERRO 404'},{id:'boss',n:'O CÉRBERO'},{id:'puzzle',n:'PUZZLE NOVO'},
+{id:'cw1',n:'CAVAL. BRANCO'},{id:'cw2',n:'CAVAL. VERMELHO'},{id:'cw3',n:'CAVAL. PRETO'},{id:'cw4',n:'CAVAL. DESCORADO'}];
 function buildLabCards(){
 const box=ov('labCards');
 if(!box)return;
@@ -4948,6 +6347,11 @@ buildPuzzle();
 return;
 }
 if(id==='rk'){game.reiFought=false;}
+/* Cavaleiros do Apocalipse: em vez de spawn direto, dispara a cutscene de intro */
+if(id==='cw1'||id==='cw2'||id==='cw3'||id==='cw4'){
+startKnightIntro(id);
+return;
+}
 const m=game.absMain;
 spawnMarkAt(id,m.x+m.w/2,m.y+m.h*.32,true);
 const it=LAB_ITEMS.find(x=>x.id===id);
@@ -5087,7 +6491,7 @@ if(r){
 r.customBuild=bl.items.map(it=>({t:it.t,x:it.x,y:it.y}));
 if(!needsClear(r.kind))r.cleared=true;
 }
-const BIG=['mb','ex','vi','gz','rk','e404'];
+const BIG=['mb','ex','vi','gz','rk','e404','cw1','cw2','cw3','cw4'];
 for(const it of bl.items){
 if(it.t==='soul'||it.t==='heart'||it.t==='chest')pickups.push({type:it.t,x:it.x,y:it.y,t:0,ph:rnd(TAU)});
 else spawnMarkAt(it.t,it.x,it.y,BIG.indexOf(it.t)>=0);
@@ -5106,7 +6510,7 @@ for(let gx=ROOM.x+40;gx<ROOM.x+ROOM.w;gx+=56){ctx.beginPath();ctx.moveTo(gx,ROOM
 for(let gy=ROOM.y+40;gy<ROOM.y+ROOM.h;gy+=56){ctx.beginPath();ctx.moveTo(ROOM.x,gy);ctx.lineTo(ROOM.x+ROOM.w,gy);ctx.stroke();}
 /* itens já colocados */
 for(const it of bl.items){
-const bossy=['mb','ex','vi','gz','rk','e404'].indexOf(it.t)>=0;
+const bossy=['mb','ex','vi','gz','rk','e404','cw1','cw2','cw3','cw4'].indexOf(it.t)>=0;
 const item=it.t==='soul'||it.t==='heart'||it.t==='chest';
 ctx.globalAlpha=.85;
 if(item){
@@ -6282,7 +7686,7 @@ game.waveT+=dt;
 if(game.waveState==='intro'){
 if(game.waveT>1.0)game.waveState='spawning';
 }else if(game.waveState==='spawning'){
-const hold=miniBossAny()||e404Any()||reiAny();
+const hold=miniBossAny()||e404Any()||reiAny()||knightAny();
 if(!hold){
 game.spawnT-=dt;
 if(game.spawnT<=0&&game.roomQueue.length){
@@ -6292,14 +7696,14 @@ spawnMarkAt(game.roomQueue.pop());
 }
 if(!game.roomQueue.length)game.waveState='clearing';
 }else if(game.waveState==='clearing'){
-if(!enemies.length&&!spawnMarks.length&&!miniBossAny()&&!e404Any()&&!reiAny())roomCleared();
+if(!enemies.length&&!spawnMarks.length&&!miniBossAny()&&!e404Any()&&!reiAny()&&!knightAny())roomCleared();
 }
 }
 function collectRoomPickups(){
 let souls=0,hearts=0;
 for(const p of pickups){if(p.type==='soul')souls++;else if(p.type==='heart')hearts++;}
 if(hearts>0&&player.hp<player.maxHp){player.hp=Math.min(player.maxHp,player.hp+hearts);sfx.heart();}
-pickups=pickups.filter(function(p){return p.type==='chest'||p.type==='kingsoul';});
+pickups=pickups.filter(function(p){return p.type==='chest'||p.type==='kingsoul'||p.type==='knightrelic';});
 if(souls>0)gainSouls(souls);
 }
 function roomCleared(){
@@ -6715,6 +8119,8 @@ function updatePlay(dt){
  updateMagics(dt);
  updateKingSoul(dt);
  updateReiUltimate(dt);
+ /* checa ativação do Triunfo dos Cavaleiros do Apocalipse */
+ {const k=knightAny2();if(k&&!k.triunfo)cwCheckTriumph(k);}
  updateShock(dt);
  updateThrownSaw(dt);
  updateHammers(dt);
@@ -7180,6 +8586,11 @@ if(e.flash>0){
 ctx.fillStyle='rgba(255,240,210,'+Math.min(.75,e.flash*6)+')';
 ctx.beginPath();ctx.arc(e.x,e.y,e.r+12,0,TAU);ctx.fill();
 }
+ctx.restore();
+return;
+}
+if(e.type==='cw1'||e.type==='cw2'||e.type==='cw3'||e.type==='cw4'){
+drawKnight(e);
 ctx.restore();
 return;
 }
@@ -8024,7 +9435,7 @@ ctx.closePath();
 function drawPickups(){
 for(const p of pickups){
 const bob=Math.sin(game.t*4+p.ph)*4;
-const fade=p.t>9?(p.type==='chest'||p.type==='kingsoul'?1:.4+.4*Math.sin(game.t*14)):1;
+const fade=p.t>9?(p.type==='chest'||p.type==='kingsoul'||p.type==='knightrelic'?1:.4+.4*Math.sin(game.t*14)):1;
 ctx.globalAlpha=fade;
 if(p.type==='soul'){
 ctx.globalAlpha=fade*(.2+.15*Math.sin(game.t*8+p.ph));
@@ -8068,6 +9479,29 @@ ctx.globalAlpha=fade;
 drawKingPiece(p.x,p.y+bobK,.85,'#d8cfc0');
 ctx.globalAlpha=.6+.3*Math.sin(game.t*3);
 txt('ALMA DO REI ANTIGO',p.x,p.y+bobK-56,MONO,10,'#ffd9a0','center',3);
+}else if(p.type==='knightrelic'){
+const bobR=Math.sin(game.t*2.4+p.ph)*5;
+const col=p.relicColor||'#ffd9a0',glow=p.relicGlow||'#d9465a';
+ctx.globalAlpha=.3+.15*Math.sin(game.t*3);
+ctx.fillStyle=glow;
+ctx.beginPath();ctx.arc(p.x,p.y+bobR,42,0,TAU);ctx.fill();
+ctx.globalAlpha=fade;
+/* núcleo pulsante */
+const pulse=1+.1*Math.sin(game.t*6);
+ctx.fillStyle=col;
+ctx.beginPath();ctx.arc(p.x,p.y+bobR,16*pulse,0,TAU);ctx.fill();
+ctx.strokeStyle=glow;ctx.lineWidth=2.5;
+ctx.beginPath();ctx.arc(p.x,p.y+bobR,22*pulse,0,TAU);ctx.stroke();
+/* estrela central */
+ctx.fillStyle=glow;
+ctx.save();ctx.translate(p.x,p.y+bobR);ctx.rotate(game.t*1.2);
+for(let i=0;i<5;i++){
+const a=i/5*TAU-Math.PI/2;
+ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(Math.cos(a)*8,Math.sin(a)*8);ctx.lineTo(Math.cos(a+.18)*4,Math.sin(a+.18)*4);ctx.closePath();ctx.fill();
+}
+ctx.restore();
+ctx.globalAlpha=.7+.3*Math.sin(game.t*4);
+txt('RELÍQUIA',p.x,p.y+bobR-46,MONO,10,col,'center',3);
 }else{
 const pulse=1+.08*Math.sin(game.t*6+p.ph);
 ctx.globalAlpha=fade*(.2+.12*Math.sin(game.t*8+p.ph));
@@ -8643,6 +10077,45 @@ ctx.strokeRect(x0,y,total,h);
 ctx.fillStyle=Math.floor(game.t*4)%2?'#ff4fd8':'#4ff5ff';
 ctx.fillRect(x0+1.5,y+1.5,Math.max(0,(total-3)*e4.hp/e4.maxHp),h-3);
 }
+function drawKnightBar(){
+const k=knightAny();
+if(!k)return;
+const kd=KNIGHT_DATA[k.type];if(!kd)return;
+const total=660,x0=W/2-total/2,y=38,h=13;
+const phaseLbl=k.p2?' — FASE II · '+kd.concept:' — '+kd.concept+(k.horseHp>0?' · CAVALO':'');
+txt(kd.name+phaseLbl+(k.triunfo?' · TRIUNFO '+Math.ceil(k.triumphT)+'s':''),W/2,y-12,MONO,11,kd.col,'center',4);
+ctx.strokeStyle=kd.accent;ctx.lineWidth=1;
+ctx.strokeRect(x0,y,total,h);
+ctx.fillStyle=kd.col;
+ctx.fillRect(x0+1.5,y+1.5,Math.max(0,(total-3)*k.hp/k.maxHp),h-3);
+/* se montado: barra extra do cavalo */
+if(!k.p2&&k.horseMaxHp>0){
+const hy=y+22;
+txt('CAVALO',W/2-hy,y-12,MONO,9,kd.accent,'center',3);
+ctx.strokeStyle='rgba(140,28,44,.5)';ctx.lineWidth=1;
+ctx.strokeRect(x0+60,hy,total-120,5);
+ctx.fillStyle=kd.accent;
+ctx.fillRect(x0+61,hy+1,Math.max(0,(total-122)*k.horseHp/k.horseMaxHp),3);
+}
+/* Triunfo: barra de progresso da condição especial */
+if(k.triunfo){
+const ty=y+(k.p2?0:22)+12;
+const left=clamp(game.knightHeartsCollected/Math.max(1,game.knightHeartsNeeded),0,1);
+const tleft=clamp(k.triumphT/(k.type==='cw1'?60:k.type==='cw2'?45:k.type==='cw3'?30:25),0,1);
+const lbl={cw1:'CORAÇÕES',cw2:'ARMAS QUEBRADAS',cw3:'SOBREVIVENDO',cw4:'GOLPES'}[k.type];
+txt(lbl+' '+game.knightHeartsCollected+'/'+game.knightHeartsNeeded,W/2,ty-12,MONO,9,kd.accent,'center',3);
+ctx.strokeStyle='rgba(201,164,76,.5)';ctx.lineWidth=1;
+ctx.strokeRect(W/2-160,ty,320,5);
+ctx.fillStyle=kd.accent;
+ctx.fillRect(W/2-159,ty+1,318*left,3);
+/* tempo */
+txt('TEMPO '+Math.ceil(k.triumphT)+'s',W/2,ty+12,MONO,9,'#d9465a','center',3);
+ctx.strokeStyle='rgba(217,70,90,.5)';ctx.lineWidth=1;
+ctx.strokeRect(W/2-160,ty+22,320,4);
+ctx.fillStyle='#d9465a';
+ctx.fillRect(W/2-159,ty+23,318*tleft,2);
+}
+}
 function drawHUD(){
 if(game.state==='menu'||game.state==='select'||game.state==='won')return;
 drawRoomMap();
@@ -8657,6 +10130,7 @@ drawBossBar();
 txt('DESCIDA '+roman(game.floor)+'/V — '+(game.hard?'ABISMO':'PADRÃO')+' · SEGREDOS '+Math.round(opts.secret*100)+'%',W/2,by+2,MONO,10,game.hard?'#d9465a':'#8a7d6c','center',2);
 if(e404Any())drawE404Bar();
 else if(reiAny())drawReiBar();
+else if(knightAny())drawKnightBar();
 else if(miniBossAny())drawMiniBossBar();
 else if(game.roomEvent)txt('EVENTO: '+EVENT_LABEL[game.roomEvent.type],W/2,by+20,MONO,10,'#c9a0ff','center',2);
 else txt('DEMÔNIOS '+enemyCount(),W/2,by+20,MONO,10,'#6e6357','center',2);
@@ -8770,6 +10244,13 @@ drawReiIntro();
 ctx.restore();
 return;
 }
+if(game.state==='knightintro'){
+if(roomFloor)ctx.drawImage(roomFloor,ROOM.x,ROOM.y);
+drawParticles();
+drawKnightIntro();
+ctx.restore();
+return;
+}
 ctx.fillStyle='#040304';ctx.fillRect(0,0,W,H);
 if(roomFloor)ctx.drawImage(roomFloor,ROOM.x,ROOM.y);
 drawGroundEmbers();
@@ -8841,6 +10322,7 @@ drawHUD();
 drawBanners();
 drawEndingUI();
 if(game.state==='reideath')drawReiDeathUI();
+if(game.state==='knightdeath')drawKnightDeathUI();
 drawWindowScene();
 if((game.state==='ending'&&game.endPhase==='closed')||game.state==='won'){
 ctx.fillStyle='rgba(5,3,4,'+(ramp(game.endT,.2,1.4)*.92)+')';
@@ -8923,6 +10405,8 @@ else if(game.state==='play')updatePlay(dt);
 else if(game.state==='e404intro')updateE404Intro(dt);
 else if(game.state==='reiintro')updateReiIntro(dt);
 else if(game.state==='reideath')updateReiDeath(dt);
+else if(game.state==='knightintro')updateKnightIntro(dt);
+else if(game.state==='knightdeath')updateKnightDeath(dt);
 else if(game.state==='bossintro'){
 updatePlayer(dt);
 updateShot(dt);
