@@ -1,0 +1,129 @@
+COLOQUE SEUS SPRITES NESTA PASTA
+================================
+
+Formatos aceitos: .png (recomendado — aceita transparência),
+.jpg/.jpeg/.webp também funcionam (maiúsculas ou minúsculas).
+
+DETECÇÃO AUTOMÁTICA (v4):
+- Ao carregar a página E também com o jogo já rodando: a pasta é
+  re-escaneada a cada ~15 segundos e sempre que a janela ganha foco.
+  Colou um sprite novo? Ele entra sozinho em poucos segundos
+  (ou force com __SPRITES_RESCAN() no console).
+- Nomes ficaram flexíveis: VELHO-REI.png, Velho Rei.png, velho_rei.png
+  e corrupção de acentos (corrupião.png) tudo funciona igual.
+- Sem o arquivo, o desenho original do jogo é usado — nada quebra,
+  nunca fica invisível.
+- Opcional — manifesto assets/sprites/sprites.txt (ou lista.txt),
+  uma linha por sprite, para usar QUALQUER nome de arquivo:
+      velho-rei = minha-arte-do-rei.png
+      sombra: sombra_custom.jpg
+  (linhas com # são comentários)
+
+=== PERSONAGENS (arquivo principal de cada um) ===
+  thor.png               — o Thor (cachorro). DESENHE OLHANDO PARA A
+                           DIREITA: o jogo gira o sprite conforme a mira.
+  velho-rei.png          — O VELHO REI (fase I e II)
+  espelho.png            — os espelhos/sombras da fase II do Rei
+  erro-404.png           — Erro 404
+  bruxo.png              — O Bruxo
+  carrasco.png           — O Carrasco
+  viuva.png              — A Viúva
+  golem.png              — O Golem
+  cerbero.png            — O CÉRBERO INTEIRO (boss multi-cabeças)
+  cerbero-cabeca.png     — alternativa: só as cabeças do Cérbero
+                           (se cerbero.png existir, ele tem prioridade)
+  caronte.png            — CARONTE na batalha do rio (o remo continua
+                           desenhado pelo jogo para leitura do ataque)
+  cavaleiro-branco.png   — Cavaleiro da Conquista
+  cavaleiro-vermelho.png — Cavaleiro da Guerra
+  cavaleiro-preto.png    — Cavaleiro da Fome
+  cavaleiro-descorado.png— Cavaleiro da Morte
+  observador.png         — O Observador
+  peao.png               — Peões do Rei
+  filhote.png            — Filhotes do Cérbero
+
+=== INIMIGOS COMUNS (todos agora aceitam sprite!) ===
+  sombra.png             — Sombra Desperta       (ou sh.png)
+  brutamonte.png         — Brutamonte            (ou br.png)
+  cuspedor.png           — Cuspedor              (ou sp.png)
+  feiticeiro.png         — Feiticeiro de Gelo    (ou fs.png)
+  espectro-veloz.png     — Espectro Veloz        (ou ru.png)
+  ceifador.png           — Ceifador              (ou ce.png)
+  grao-de-ossos.png      — Grão-de-Ossos         (ou gd.png)
+  alma-perdida.png       — Alma Perdida          (ou al.png)
+  espectro.png           — Espectro              (ou es.png)
+  lamentadora.png        — Lamentadora           (ou la.png)
+  corrupiao.png          — Corrupião             (ou cr.png)
+  corrupiao-menor.png    — Corrupião-Menor       (ou crs.png)
+  vigia.png              — Vigia                 (ou vg.png)
+  peregrino.png          — Peregrino Cinzento    (ou pg.png)
+  faisca-fantasma.png    — Faísca-Fantasma       (ou fa.png)
+  morcego.png            — Morcego Flamejante    (v1.3.3 — já vem com o jogo)
+
+  Apelidos curtos (sh, br, sp...) e nomes com acento/maiúscula
+  funcionam automaticamente — ex.: "Sombra Desperta.png" também vale.
+
+=== CENÁRIO ===
+  fundo.png              — piso das salas. A imagem é esticada até
+                           cobrir a sala (recortada no formato dela);
+                           paredes, bordas e brasas continuam por cima.
+
+=== ESCOLA (4ª descida "???") ===
+  Os sprites da escola ficam na subpasta assets/sprites/escola/
+  (cacador.png, cacador-cabeca.png, fragmento.png, espelho.png) —
+  veja o COLOQUE-SPRITES-AQUI.txt de lá.
+
+=== BÊNÇÕES / PACTOS / ITENS (v1.1.3 — A FACE DO PACTO) ===
+  A arte das bênçãos, pactos e itens ativos fica na subpasta
+  assets/sprites/drops/ — um PNG por item, com o ID do item
+  (forca.png, iraodin.png, latido.png…) ou com o nome dele
+  (forca-do-pacto.png, latido-infernal.png…). Aparece na carta
+  da escolha, no drop do baú, na feira do Errante, no drop do
+  item ativo e nas miniaturas do grimório/arca. Lista COMPLETA
+  dos nomes no COLOQUE-SPRITES-AQUI.txt de dentro de drops/.
+
+=== O que continua desenhado pelo jogo ===
+- Flash de dano, veneno, lentidão e o anel de telegrafia aparecem
+  POR CIMA do seu sprite (legibilidade do combate preservada).
+- Aura de triunfo dos Cavaleiros continua sobre o sprite.
+- Feixes/ataques do Cérbero e o remo do Caronte continuam vetoriais.
+- Corredores, cutscenes e transições continuam do jogo.
+
+=== Dicas ===
+=== NOVO v1.2.0 — DIRECIONAIS, GIF/VÍDEO, ARMAS E CUTSCENE ===
+
+  DIRECIONAIS (o jogo troca sozinho pela direção do olhar):
+    thor_frente.png        — Thor olhando para BAIXO (de frente pra você)
+    thor_tras.png          — Thor olhando para CIMA (de costas)
+    thor_lado.png          — Thor de PERFIL olhando para a DIREITA
+                             (vira espelhado para a esquerda)
+    <inimigo>_frente.png / _tras.png / _lado.png — vale para TODOS:
+                             ex. cavaleiro_branco_tras.png, sombra_frente.png,
+                             velho-rei-lado.png (com ou sem "_" ou "-", tanto faz)
+    Sem o arquivo da direção, o jogo usa o sprite principal (girando).
+
+  ANIMAÇÃO:
+    .gif animado           — salve qualquer slot como .gif (ex.: thor.gif,
+                             cacador.gif em escola/) e ele é detectado igual
+    VÍDEO (.mp4/.webm)     — salve ex.: thor.mp4 ou caronte.webp... um vídeo
+                             mudo em laço vira o sprite (ótimo para folhetos
+                             vivos); funciona via http/servidor local
+
+  CUTSCENE:
+    cutscene.png|gif|mp4   — aparece em tela cheia na abertura da ESCOLA
+
+  ARMAS (pasta assets/sprites/armas/ — já vem com as nossas!):
+    pistolas.png           — o par (desenhada nas duas patas ao mesmo tempo)
+    tiro.png               — a pistola única
+    feixe.png              — a marca de carga do FEIXE
+    serra.png / espada.png / mordida.png
+    Troque qualquer uma e a arma muda de cara — sem tocar no código.
+
+- Tamanho livre: o jogo redimensiona preservando a proporção.
+  Thor cabe numa caixa ~46×50; inimigos escalam com o tamanho deles.
+- Diagnóstico no console (F12): __SPRITES_DEBUG() lista encontrados
+  e faltantes; __SPRITES_RESCAN() força nova varredura.
+
+Obs.: se abrir com duplo clique (file://) as imagens normalmente
+aparecem; se algo não carregar, use um servidor local
+("python -m http.server" nesta pasta) e recarregue.

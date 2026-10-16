@@ -1,0 +1,19 @@
+AS ARMAS AGORA TÊM SPRITE — TROQUE AS SUAS AQUI
+================================================
+Esta pasta já vem com as artes padrão das armas (desenhadas por nós).
+Solte um arquivo com o MESMO NOME para substituir a arte na hora
+(re-escaneada a cada ~15s; force com __SPRITES_RESCAN() no console).
+
+  pistolas.png   — as PISTOLAS GÊMEAS/DUPLAS (desenhada nas duas patas)
+  tiro.png       — a pistola única (antes da benção das gêmeas)
+  feixe.png      — a marca de carga do FEIXE
+  serra.png      — a motosserra
+  espada.png     — a espada
+  mordida.png    — a mordida da fera
+  colher.png     — v1.3.4: a COLHER COMICAMENTE GRANDE PARADA (carregada)
+  colher-ataque.png — v1.3.4: a colher ATACANDO (a colherada)
+
+Formatos: .png (ideal), .jpg/.jpeg/.webp/.gif.
+Desenhe apontando para a DIREITA: o jogo gira conforme a mira.
+Tamanho sugerido: 64×64 (o jogo preserva a proporção).
+Na versão standalone as artes desta pasta vão embutidas no arquivo único.

@@ -1,0 +1,25 @@
+================================================================
+O CONVITE — sprites do castelo do bruno
+================================================================
+
+Coloque aqui os PNG/JPG/WEBP do castelo. Nomes aceitos
+(maiúsculas/minúsculas tanto faz, .png .jpg .jpeg .webp):
+
+  cervo.png        — O CERVO (a testemunha; aparece cada vez mais perto)
+  monge.png        — MONGE AFOGADO (molhado, cospe água, deixa poças)
+  penitente.png    — O PENITENTE (arrasta correntes; ajoelha, depois bate)
+  vigilante.png    — A VIGILANTE (não a olhe... ou olhe. ela congela)
+  sem-rosto.png    — O SEM-ROSTO (o que caiu da lua — boss da cripta)
+  rosto.png        — o sem-rosto na lua (emergindo da racha; opcional —
+                     se não tiver, usa sem-rosto.png)
+  lua.png          — A LUA (a que racha; opcional)
+
+Sem arquivo → desenho vetorial embutido (nada quebra).
+Adicionou com o jogo aberto? Ele detecta sozinho em ~15s,
+ou rode __CASTELLO_RESCAN_SPRITES() no console (F12).
+
+Diagnóstico geral: __SPRITES_DEBUG()   (sprites do jogo inteiro)
+
+----------------------------------------------------------------
+dica: digite "bruno" no menu do jogo.
+a casa aceita o nome.

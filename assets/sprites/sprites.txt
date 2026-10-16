@@ -1,0 +1,7 @@
+# manifesto OPCIONAL — mapeie um slot do jogo para QUALQUER arquivo seu
+# (uma linha por sprite; linhas com # são comentários)
+# os sprites de teste saíram (v1.5.8) — a pasta está limpa para a SUA arte
+# exemplos:
+# lamentadora = minha-lamentadora.png
+# morcego = morcego-flamejante.png
+# cérbero = cerbero-arte-final.png

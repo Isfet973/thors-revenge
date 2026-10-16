@@ -1,0 +1,41 @@
+COLOQUE SUAS MÚSICAS NESTA PASTA
+================================
+
+Formatos aceitos: .mp3 (recomendado), .ogg ou .wav
+O jogo detecta os arquivos automaticamente ao carregar.
+
+Nomes reconhecidos:
+  menu.mp3              — música do menu principal
+  inferno.mp3           — música da gameplay normal (fases/corredores)
+  chefe.mp3             — música de todos os chefes (genérica)
+  velho-rei.mp3         — O VELHO REI — fase I
+  velho-rei-fase2.mp3   — O VELHO REI — fase II (Espehos das Sombras)
+  cerbero.mp3           — Cérbero
+  bruxo.mp3             — O Bruxo
+  carrasco.mp3          — O Carrasco
+  viuva.mp3             — A Viúva
+  golem.mp3             — O Golem
+  erro-404.mp3          — Erro 404
+  caronte.mp3           — Caronte
+  cavaleiro-branco.mp3 / cavaleiro-vermelho.mp3 /
+  cavaleiro-preto.mp3 / cavaleiro-descorado.mp3  — Cavaleiros
+  observador.mp3        — O Observador
+  vitoria.mp3           — tela de vitória
+  morte.mp3             — tela de game over
+  vulcan.mp3            — v1.3.0: A GARGANTA VULCÂNICA
+  azul.mp3              — v1.3.0: O CORREDOR AZULADO (névoa fria)
+  portao.mp3            — v1.3.0: O CAMINHO DO PORTÃO
+  cerberus.mp3          — v1.3.0: cutscene de entrada do CÉRBERO
+  boss:juiz.mp3         — v1.3.0: O JUIZ SEM ROSTO
+  boss:ferreiro.mp3     — v1.3.0: O FERREIRO DAS ALMAS
+  boss:anjo.mp3         — v1.3.0: O ANJO ACORRENTO
+  boss:serp.mp3         — v1.3.0: A SERPENTE QUE ENGOLE ESTRELAS
+  boss:sthor.mp3        — v1.3.0: O THOR QUE NÃO DESCEU
+  silencio.mp3          — v1.3.0: modificador SILÊNCIO ABSOLUTO (raro usar)
+
+Não tem um arquivo? Sem problema: o jogo usa o tema sintetizado
+embutido (nunca fica mudo, nunca quebra).
+
+Obs.: se você abrir o jogo com duplo clique (file://) e seus arquivos
+não tocarem, seu navegador pode estar bloqueando áudios locais —
+prefira um servidor local (ex.: "python -m http.server" nesta pasta).

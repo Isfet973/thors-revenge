@@ -1,0 +1,133 @@
+================================================================
+ A FACE DO PACTO — ARTE DAS BÊNÇÕES / PACTOS / ITENS (v1.1.3)
+================================================================
+
+Coloque aqui um PNG (ou JPG/WEBP) com a ARTE de cada bênção, pacto
+ou item ativo. O sprite aparece em TODA a parte:
+  • NA CARTA da escolha (no lugar do glifo desenhado)
+  • NO DROP do baú, flutuando no chão
+  • NA FEIRA do Errante (mercadoria de bênção/pacto)
+  • NO DROP de item ativo (quando troca o ativo equipado)
+  • NAS MINIATURAS do grimório e da arca (tecla 3)
+
+REGRAS DO NOME DO ARQUIVO (escolha UMA das duas formas):
+  1) ID do item   — ex.: forca.png, iraodin.png, latido.png
+  2) NOME do item — sem acentos, espaços viram "-", minúsculas:
+     "FORÇA DO PACTO" → forca-do-pacto.png
+     "LATIDO INFERNAL" → latido-infernal.png
+  (.PNG .jpg .jpeg .webp funcionam; maiúsculas tanto faz)
+  Tamanho livre — ideal ~64×64 px (quadrado, fundo transparente).
+  Sem arquivo, o jogo usa o glifo/nome de sempre — NADA quebra.
+  Trocou com o jogo rodando? Itens na tela re-leem a pasta a cada
+  ~6s. No console (F12): __DROPS_RESCAN() força, __DROPS_DEBUG()
+  lista o que foi encontrado. A versão de arquivo único
+  (tharos-standalone.html) embute as artes existentes no momento
+  do build — para trocar lá, use a versão zip/pasta avulsa.
+
+
+=== BÊNÇÕES (50) ==============================================
+
+  vento.png                → PASSO DO VENTO              (ou passo-do-vento.png)
+  ima.png                  → ÍMÃ DE ALMAS                (ou ima-de-almas.png)
+  forca.png                → FORÇA DO PACTO              (ou forca-do-pacto.png)
+  mercurio.png             → PÉS DE MERCÚRIO             (ou pes-de-mercurio.png)
+  alcance.png              → BRAÇO DO TITÃ               (ou braco-do-tita.png)
+  gemeas.png               → LÂMINAS GÊMEAS              (ou laminas-gemeas.png)
+  sangue.png               → SANGUE FERVENTE             (ou sangue-fervente.png)
+  mandibula.png            → MANDÍBULA DO ABISMO         (ou mandibula-do-abismo.png)
+  gelo.png                 → GELO DO PRIMEIRO FRIO       (ou gelo-do-primeiro-frio.png)
+  fogo.png                 → FOGO DA PRIMEIRA CHAMA      (ou fogo-da-primeira-chama.png)
+  veneno.png               → PEÇONHA DA SERPENTE         (ou peconha-da-serpente.png)
+  raio.png                 → IRA DA TEMPESTADE           (ou ira-da-tempestade.png)
+  fome.png                 → FOME DA FERA                (ou fome-da-fera.png)
+  unlockShot.png           → TROVÃO À DISTÂNCIA          (ou trovao-a-distancia.png)
+  unlockBite.png           → MORDIDA DA FERA             (ou mordida-da-fera.png)
+  nova.png                 → NOVA GÉLIDA                 (ou nova-gelida.png)
+  presafogo.png            → PRESAS EM BRASA             (ou presas-em-brasa.png)
+  presagelo.png            → PRESAS DE GELO              (ou presas-de-gelo.png)
+  presaveneno.png          → PRESAS PEÇONHENTAS          (ou presas-peconhentas.png)
+  presasismo.png           → MANDÍBULA SÍSMICA           (ou mandibula-sismica.png)
+  mjolnir.png              → O VEREDICTO                 (ou o-veredicto.png)
+  trovao.png               → TROVÃO LONGÍNQUO            (ou trovao-longinquo.png)
+  gross.png                → SANGUE GROSSO               (ou sangue-grosso.png)
+  motoserra.png            → MOTOSERRA                   (ou motoserra.png)
+  gram.png                 → GRIMM, LÂMINA DRAGÃO        (ou grimm-lamina-dragao.png)
+  estacas.png              → ESTACAS DE GELO ETERNO      (ou estacas-de-gelo-eterno.png)
+  explosao.png             → EXPLOSÃO DE ENXOFRE         (ou explosao-de-enxofre.png)
+  sismica.png              → BALAS SÍSMICAS              (ou balas-sismicas.png)
+  trevas.png               → TREVAS DO VÉU               (ou trevas-do-veu.png)
+  luz.png                  → LUZ DA ACUSAÇÃO             (ou luz-da-acusacao.png)
+  guarda.png               → GUARDA PROFANA              (ou guarda-profana.png)
+  onda.png                 → ONDA DO ABISMO              (ou onda-do-abismo.png)
+  berserk.png              → FRENESI                     (ou frenesi.png)
+  storm.png                → TEMPESTADE ETERNA           (ou tempestade-eterna.png)
+  sede.png                 → SEDE DE SANGUE              (ou sede-de-sangue.png)
+  iraodin.png              → IRA DO SOBERANO             (ou ira-do-soberano.png)
+  heimdall.png             → OLHO DO VIGIA               (ou olho-do-vigia.png)
+  olho.png                 → OLHO DO CAÇADOR             (ou olho-do-cacador.png)
+  pistolas.png             → PISTOLAS GÊMEAS             (ou pistolas-gemeas.png)
+  feixe.png                → O FEIXE                     (ou o-feixe.png)
+  garra.png                → GARRA DE FERA               (ou garra-de-fera.png)
+  feixedorei.png           → FEIXE DO REI                (ou feixe-do-rei.png)
+  pantera.png              → INSTINTO DE PANTERA         (ou instinto-de-pantera.png)
+  cinzas.png               → CINZAS DO RITUAL            (ou cinzas-do-ritual.png)
+  mundo.png                → O MUNDO                     (ou o-mundo.png)
+  mundo2.png               → O MUNDO · TEMPUS            (ou o-mundo--tempus.png)
+  mundo3.png               → O MUNDO · AETERNUM          (ou o-mundo--aeternum.png)
+  mundo4.png               → O MUNDO · INFINITUM         (ou o-mundo--infinitum.png)
+  coracao.png              → CORAÇÃO                     (ou coracao.png)
+  lagrimas.png             → LÁGRIMAS                    (ou lagrimas.png)
+
+=== PACTOS (cobram um preço — 19) ===============================
+
+  sanguepesado.png         → SANGUE PESADO               (ou sangue-pesado.png)
+  polvora.png              → PÓLVORA LEVE                (ou polvora-leve.png)
+  pactovao.png             → PACTO DO VÃO                (ou pacto-do-vao.png)
+  furia.png                → FÚRIA DO TROVÃO             (ou furia-do-trovao.png)
+  sanguefrio.png           → SANGUE FRIO                 (ou sangue-frio.png)
+  ferroada.png             → FERROADA DUPLA              (ou ferroada-dupla.png)
+  pesadelo.png             → PESADELO CEGO               (ou pesadelo-cego.png)
+  fuga.png                 → O PACTO DA FUGA             (ou o-pacto-da-fuga.png)
+  coracaofalso.png         → CORAÇÃO FALSO               (ou coracao-falso.png)
+  vendaval.png             → VENDAVAL                    (ou vendaval.png)
+  olhogordo.png            → OLHO GORDO                  (ou olho-gordo.png)
+  pactofome.png            → PACTO DA FOME               (ou pacto-da-fome.png)
+  cargapedra.png           → CARGA DE PEDRA              (ou carga-de-pedra.png)
+  espelho.png              → ESPELHO QUEBRADO            (ou espelho-quebrado.png)
+  ganancia.png             → GANÂNCIA                    (ou ganancia.png)
+  vidro.png                → CORPO DE VIDRO              (ou corpo-de-vidro.png)
+  pressa.png               → PRESSA CEGA                 (ou pressa-cega.png)
+  isolamento.png           → ISOLAMENTO                  (ou isolamento.png)
+  fomeinsaciavel.png       → FOME INSCIÁVEL              (ou fome-insciavel.png)
+
+=== ITENS ATIVOS (tecla correspondente · 20) ====================
+
+  sino.png                 → SINO DA ESCOLA              (ou sino-da-escola.png)
+  feixedorei.png           → FEIXE DO REI                (ou feixe-do-rei.png)
+  latido.png               → LATIDO INFERNAL             (ou latido-infernal.png)
+  mundo.png                → O MUNDO                     (ou o-mundo.png)
+  estrela.png              → ESTRELA DA MANHÃ            (ou estrela-da-manha.png)
+  trovao.png               → TROVÃO DO JUÍZO             (ou trovao-do-juizo.png)
+  furia.png                → FÚRIA DO POSSESSO           (ou furia-do-possesso.png)
+  cura.png                 → LÁGRIMA DA PECADORA         (ou lagrima-da-pecadora.png)
+  nevasca.png              → ANEL DO INVERNO ETERNO      (ou anel-do-inverno-eterno.png)
+  ampulheta.png            → AMPULHETA QUEBRADA          (ou ampulheta-quebrada.png)
+  portal.png               → PORTA DAS SOMBRAS           (ou porta-das-sombras.png)
+  corvos.png               → MURMÚRIO DOS CORVOS         (ou murmurio-dos-corvos.png)
+  escudo.png               → ÉGIDE DO PACTO              (ou egide-do-pacto.png)
+  girassol.png             → SEMENTE DA VIDA             (ou semente-da-vida.png)
+  piroclismo.png           → PIROCLASMO                  (ou piroclasmo.png)
+  decreto.png              → DECRETO DO ABISMO           (ou decreto-do-abismo.png)
+  imagem.png               → IMAGEM ESPELHADA            (ou imagem-espelhada.png)
+  municao.png              → MUNIÇÃO ÉTERICA             (ou municao-eterica.png)
+  forma.png                → FORMA DA FERA               (ou forma-da-fera.png)
+  meteoro.png              → CHAMADO DO PRIMEIRO FOGO    (ou chamado-do-primeiro-fogo.png)
+
+=== ESPECIAIS ===================================================
+
+  manto.png             → MANTO DAS ALMAS (pacto único de Caronte)
+
+Obs.: IDs válidos = campo id de cada pacto/bênção do jogo. A lista
+acima é COMPLETA (v1.1.3) — 50 bênçãos + 19 pactos + 20 itens ativos + o manto.
+Dica: o jogo também aceita QUALQUER um dos dois nomes por item —
+use o que preferir. Nada aqui é obrigatório.

@@ -1,0 +1,31 @@
+COLOQUE SEUS EFEITOS SONOROS NESTA PASTA
+========================================
+
+Formatos aceitos: .mp3 (recomendado), .ogg ou .wav
+O jogo detecta cada efeito na primeira vez que ele toca.
+
+Use o MESMO NOME do efeito do jogo. Lista completa:
+
+  glitch, levelup, heart, echo, rumble, roar, gate, static,
+  creak, growl, hurt, die, dash, throw, saw, howl, parry,
+  headDie, boom, spit, shotS, thunder, freeze, ehit, bhit,
+  thud, bite, slash, nova, stake, shock, kill, explode, win,
+  soul, dust, snore, heartbeat
+
+Exemplos de nomes de arquivo:
+  boom.mp3  roar.mp3  levelup.mp3  hurt.wav  shotS.mp3
+
+Atenção maiúsculas/minúsculas exatamente como na lista
+(ex.: headDie.mp3, shotS.mp3).
+
+  heartbeat            — (NOVO v0.9.12) a BATIDA DO CORAÇÃO da escola.
+                         Toca cada vez mais rápido quanto mais perto
+                         a criatura está. Aceita heartbeat.mp3 aqui na
+                         pasta sfx/ OU em assets/audio/heartbeat.mp3.
+
+Não tem o arquivo? Sem problema: o jogo usa o efeito sintetizado
+embutido (nunca fica mudo, nunca quebra).
+
+Obs.: se você abrir o jogo com duplo clique (file://) e seus arquivos
+não tocarem, seu navegador pode estar bloqueando áudios locais —
+prefira um servidor local (ex.: "python -m http.server" nesta pasta).

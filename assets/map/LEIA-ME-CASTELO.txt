@@ -1,0 +1,36 @@
+O MAPA DO CASTELO — EDITE AQUI
+==============================
+
+O castelo do save BRUNO é gerado pelo arquivo:
+
+    CASTELO-MAPA.js   (nesta mesma pasta)
+
+Abra ele em qualquer editor de texto (Bloco de Notas serve).
+Cada sala do castelo é um bloco entre { } — mude, copie, apague.
+Salve o arquivo e recarregue a página (F5). Não precisa mexer
+no game.js NUNCA.
+
+Dentro do CASTELO-MAPA.js tem o manual completo:
+- o que é cada campo (id, at, kind, name, weird, word, wave,
+  stairs, rects, doors);
+- os códigos dos inimigos que podem aparecer na onda;
+- as regras de ouro para o castelo continuar funcionando.
+
+Resumo rápido:
+- weird      → quanto mais perto de 1, mais bizarro/grotesco
+               (manchas → veias → dentes → carne → olhos).
+- wave       → inimigos da sala: 'sh', 'bmonge', 'bestatua',
+               'bflagelo', 'pn', 'puppy', 'observer'.
+- rects      → o formato da sala em pixels [x,y,largura,altura].
+- doors      → portas: n=cima, s=baixo, e=direita, w=esquerda
+               (a porta de volta é criada sozinha).
+- A sala da LUA/Boss tem que se chamar 'sacada'.
+- A capela do segredo tem que se chamar 'capela'.
+
+Se o arquivo ficar com erro de digitação, o jogo usa o mapa
+padrão embutido e avisa no console (F12) — nada quebra.
+
+Sprites que combinam com o mapa (pasta assets/sprites/):
+bruno-lua.png, bruno-boss.png, bruno-figura.png, bruno-olho.png,
+bruno-braco.png, bruno-fundo.png, bruno-monge.png, bruno-estatua.png,
+bruno-penitente.png, bruno-cervo.png, bruno-susto-1/2/3.png.

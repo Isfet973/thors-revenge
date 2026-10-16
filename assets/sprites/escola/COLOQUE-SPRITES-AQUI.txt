@@ -1,0 +1,44 @@
+============================================================
+SPRITES DA 4ª DESCIDA — ??? (A ESCOLA VAZIA)
+============================================================
+
+Coloque aqui as imagens desta fase. Formatos aceitos:
+.png, .jpg, .jpeg, .webp — detectados automaticamente.
+Sem a imagem, o jogo usa o desenho vetorial embutido
+(nada quebra, nunca fica invisível).
+
+NOMES DOS ARQUIVOS:
+
+  cacador.png          — O CAÇADOR inteiro (a criatura do cervo:
+                         manto preto + caveira de cervo + chifres)
+  cacador-cabeca.png   — só a cabeça/caveira do caçador
+                         (usada se não houver cacador.png)
+  fragmento.png        — as 8 partes do ritual
+  espelho.png          — o espelho do banheiro e da escola invertida
+
+SUSTO (JUMPSCARE) — novos slots (v0.9.12):
+
+  cervo-caveira.png    — a caveira de cervo do SUSTO de tela inteira
+                         (quando ele te alcança / abre o armário)
+  rosto.png            — o rosto do susto na escola invertida
+                         (é "você" que abre o armário lá dentro)
+  estatica.png         — a textura de RUÍDO ESTÁTICO do susto
+                         (qualquer imagem grande; ela é esticada para
+                         cobrir a tela toda tremendo)
+
+Dica de tamanho: o caçador é desenhado com ~60x98 px na tela;
+o espelho ~44x96; o fragmento ~24x28. Imagens maiores são
+reduzidas proporcionalmente.
+
+O Thor continua usando o slot global:
+  assets/sprites/thor.png
+
+------------------------------------------------------------
+Tudo aqui é opcional. Delete este arquivo quando quiser.
+------------------------------------------------------------
+
+
+=== NOVO v1.2.0 ===
+  .gif animado é aceito para QUALQUER sprite da escola
+  (ex.: cacador.gif anima o caçador; fragmento.gif pisca sozinho).
+  O cervo fica mais insano a cada fragmento — a arte é sua.
