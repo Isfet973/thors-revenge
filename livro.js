@@ -1384,7 +1384,7 @@ else bootBook();
 
 /* ============ API mínima (game.js usa __BOOK.asPage/unPage) ============ */
 window.__BOOK={
-  version:'1.9.2',
+  version:'0.64.0',
   introBusy:function(){return ST.mode==='intro'||ST.busy;},
   asPage:function(name){if(name==='options')asPageOptions();},
   unPage:function(name){if(name==='options')unPageOptions();},

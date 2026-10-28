@@ -3966,6 +3966,6 @@ try{
   bind('bookTabSyn','click',function(){audio();game._bookTab='syn';renderSynTab();blip('sine',500,650,.05,.03);});
 }catch(e){console.warn('[exp] boot',e);}
 /* marca para diagnóstico */
-window.__EXP_VERSION='1.9.2'; /* v1.4.0: remaster.js entra ao lado · v1.6.0 o conserto das salas (bênção mínima na secreta, rei fecha a sala, explosivo quebra porta de inimigo/puzzle, itens sem despawn, hitbox 4px, botão do limbo final) · v1.6.1 a besta tem rosto (besta.png na tela de morte) + encaixe total na resolução (sem barras de rolagem) · v1.6.2 o carrossel das armas + limbo sem travadas + fase cinza LISA · v1.6.3 os quatro feitiços (Grimório Rasgado, Investida Ricochete, Fios da Morte, Maré de Magma) + loja em destaque + drops fora das paredes + portal espera a bênção */
+window.__EXP_VERSION='0.64.0'; /* v1.4.0: remaster.js entra ao lado · v1.6.0 o conserto das salas (bênção mínima na secreta, rei fecha a sala, explosivo quebra porta de inimigo/puzzle, itens sem despawn, hitbox 4px, botão do limbo final) · v1.6.1 a besta tem rosto (besta.png na tela de morte) + encaixe total na resolução (sem barras de rolagem) · v1.6.2 o carrossel das armas + limbo sem travadas + fase cinza LISA · v1.6.3 os quatro feitiços (Grimório Rasgado, Investida Ricochete, Fios da Morte, Maré de Magma) + loja em destaque + drops fora das paredes + portal espera a bênção */
 })(); /* fim da IIFE da expansão */
 /*__CHUNK4B_END__*/

@@ -955,7 +955,7 @@ function release(){
 
 /* ============ API ============ */
 window.__CINE={
-  version:'1.9.2',
+  version:'0.64.0',
   play:function(){return play();},
   engage:function(){engage();},
   abort:function(){abort();},

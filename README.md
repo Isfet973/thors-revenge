@@ -1,4 +1,4 @@
-# THOR REVENGE — v1.9.2 "O LIVRO VIVO · A INTRODUÇÃO CINEMATOGRÁFICA" (v60: CÍRCULOS fecha o livro e mostra
+# THOR REVENGE — v0.64.0 "O LIVRO VIVO · A INTRODUÇÃO CINEMATOGRÁFICA" (v64: CÍRCULOS fecha o livro e mostra
 # a LOUSA — os nove círculos desenhados a giz, cada ciclo no seu anel, e UM círculo
 # fora do desenho: a PENUMBRA DAS ALMAS · cada opção vira uma folha com aproximação
 # de câmera própria · MENU MAIS LEVE: o mundo atrás do menu não é mais desenhado,
@@ -7,7 +7,16 @@
 # registro das almas, página de ajustes, abertura pulável, ANIMAÇÕES DO LIVRO ·
 # EDITOR DE MODS segue fora do jogo — a forja é o mod-studio.html)
 
-## NOVO (v60 / v1.9.2) — A INTRODUÇÃO CINEMATOGRÁFICA (intro.js)
+## VERSIONAMENTO
+
+O jogo está em **0.x.y** até a **1.0.0**. Regra do esquema novo: **minor =
+número da entrada do changelog** (a atual é a **64**), **patch** para
+correções pequenas. A **1.0.0** só sai quando estiverem prontos: **todos os
+sprites originais** no jogo, a **soundtrack** finalizada e a maior parte das
+**funções e mapas**. As entradas antigas mantêm os rótulos do esquema
+anterior (**v1.x.y**).
+
+## NOVO (v64 / v0.64.0) — A INTRODUÇÃO CINEMATOGRÁFICA (intro.js)
 Depois da abertura do livro, a câmera MERGULHA no manuscrito e a história proibida se
 torna real: a prancha do grande abismo, o Inferno registrado em camadas (muralhas,
 portas fechadas, silhuetas na fumaça), as frases nas margens ("Toda queda tem um

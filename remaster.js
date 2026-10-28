@@ -7,7 +7,7 @@
 (function(){
 'use strict';
 if(window.__RM)return; /* idempotência */
-const RM={v:'1.9.2'}; /* v1.6.3: os quatro feitiços — sem mudança no remake (véu sutil, luz branca, 2ª apresentação seguem) */ /* v1.6.2: o carrossel das armas — sem mudança no remake (véu sutil, luz branca, 2ª apresentação seguem) */
+const RM={v:'0.64.0'}; /* v1.6.3: os quatro feitiços — sem mudança no remake (véu sutil, luz branca, 2ª apresentação seguem) */ /* v1.6.2: o carrossel das armas — sem mudança no remake (véu sutil, luz branca, 2ª apresentação seguem) */
 window.__RM=RM;
 /* v1.4.2 CORREÇÃO CRÍTICA: x_up vivia DENTRO da IIFE da expansão (expansion.js) —
    nunca foi global. Toda can() dos itens rm lançava "x_up is not defined",
