@@ -7,7 +7,7 @@
 (function(){
 'use strict';
 if(window.__RM)return; /* idempotência */
-const RM={v:'1.6.5'}; /* v1.6.5: o atalho ao cinza — botão O LIMBO CINZA · TESTE (última fase direto); v1.6.4: o ponto no shift — hitR 8→5 e o ponto vermelho SÓ no SHIFT; v1.6.3: só a placa (a luta da ganancia DORME atrás de GANANCIA_LUTA); v1.6.2: a MENSAGEM da spell card aparece UMA vez por card */
+const RM={v:'1.9.2'}; /* v1.6.3: os quatro feitiços — sem mudança no remake (véu sutil, luz branca, 2ª apresentação seguem) */ /* v1.6.2: o carrossel das armas — sem mudança no remake (véu sutil, luz branca, 2ª apresentação seguem) */
 window.__RM=RM;
 /* v1.4.2 CORREÇÃO CRÍTICA: x_up vivia DENTRO da IIFE da expansão (expansion.js) —
    nunca foi global. Toda can() dos itens rm lançava "x_up is not defined",
@@ -38,10 +38,10 @@ function rmTier(){
      DURAÇÃO MÁXIMA das spell cards caindo com a dificuldade (durM).
      SEM PIEDADE: velocidade e intervalo ficam AINDA mais apertados que a
      tabela do spec — os eventos completos entram por cima disso. */
-  if(d==='kaizo'||d==='penitencia')return{name:'KAIZO',spd:1.48,int:.48,cx:4,vuln:.7,stage:3,den:1.12,durM:.84};
-  if(d==='punicao'||d==='abismo')return{name:'INFERNAL',spd:1.36,int:.56,cx:3,vuln:.8,stage:2,den:1.1,durM:.9};
-  if(d==='hard')return{name:'DIFÍCIL',spd:1.26,int:.64,cx:2,vuln:1,stage:1,den:1.05,durM:.95};
-  return{name:'NORMAL',spd:1.14,int:.72,cx:0,vuln:1.3,stage:0,den:1,durM:1};
+  if(d==='kaizo'||d==='penitencia')return{name:'KAIZO',spd:1.42,int:.6,cx:4,vuln:.7,stage:3,den:1.12,durM:.84};
+  if(d==='punicao'||d==='abismo')return{name:'INFERNAL',spd:1.3,int:.7,cx:3,vuln:.8,stage:2,den:1.1,durM:.9};
+  if(d==='hard')return{name:'DIFÍCIL',spd:1.2,int:.8,cx:2,vuln:1,stage:1,den:1.05,durM:.95};
+  return{name:'NORMAL',spd:1.08,int:.9,cx:0,vuln:1.3,stage:0,den:1,durM:1};
 }
 /* v1.4.3: vida da SENTENÇA escala com a dificuldade escolhida */
 function c3hpTier(){
@@ -1216,23 +1216,21 @@ RM.cerbDown=function(){
     ebullets=[];
     RM.c3={
       ph:'dust',t:0,
-      /* v1.6.1: a SENTENÇA nasce NO MEIO, UM POUCO PRA CIMA — sobra arena
-         embaixo: mais tempo pra desviar e pra atacar */
-      x:W*.5,y:H*.34,hopX:W*.5,hopY:H*.34,hopT:0,
-      hp:Math.round((2500+(game.threat||0)*130)*c3hpTier()), /* v1.6.1: vida um pouco maior */
+      x:boss.x,y:boss.y,hopX:boss.x,hopY:boss.y,hopT:0,
+      hp:Math.round((2200+(game.threat||0)*120)*c3hpTier()),
       stage:-1,pat:null,patT:0,patStep:0,vuln:0,vulnMax:0,rest:0,lab:0,
       necks:[
-        {i:0,rise:2.6,base:0,a:Math.PI/2,g:0,sp:0,hx:W*.5,hy:H*.34-160,mouth:0},  /* central */
-        {i:1,rise:3.1,base:-.85,a:Math.PI/2-.85,g:0,sp:0,hx:W*.5-90,hy:H*.34-130,mouth:0}, /* esquerda */
-        {i:2,rise:3.6,base:.85,a:Math.PI/2+.85,g:0,sp:0,hx:W*.5+90,hy:H*.34-130,mouth:0}  /* direita */
+        {i:0,rise:2.6,base:0,a:Math.PI/2,g:0,sp:0,hx:boss.x,hy:boss.y-160,mouth:0},  /* central */
+        {i:1,rise:3.1,base:-.85,a:Math.PI/2-.85,g:0,sp:0,hx:boss.x-90,hy:boss.y-130,mouth:0}, /* esquerda */
+        {i:2,rise:3.6,base:.85,a:Math.PI/2+.85,g:0,sp:0,hx:boss.x+90,hy:boss.y-130,mouth:0}  /* direita */
       ],
       marks:[],cols:[],ringFx:[],touchCd:0,meleeSeen:0,biteSeen:0,
       invul:true,glow:0,hop:0,
       avisoT:0,avisoDur:3.0,_aviso:0,_gone:0,_healed:0
     };
     RM.c3.maxHp=RM.c3.hp;
-    /* v1.4.6: 8 BARRAS também na luta do portão · v1.6.1: 9 no KAIZO (a nona é o JULGAMENTO VERDADEIRO) */
-    RM.c3.bars=(rmTier().name==='KAIZO'?9:8);RM.c3.barIdx=0;
+    /* v1.4.6: 8 BARRAS também na luta do portão (mesma regra do laboratório) */
+    RM.c3.bars=8;RM.c3.barIdx=0;
     RM.c3.barMax=Math.max(140,Math.round(RM.c3.maxHp/8));
     RM.c3.hp=RM.c3.barMax;
     game.banner=null;game.headBanner=null;
@@ -1246,7 +1244,7 @@ RM.cerbDown=function(){
 RM.startSentenca=function(x,y){
   try{
     if(RM.c3||game._rmSent)return false;
-    x=(typeof x==='number')?x:W*.5;y=(typeof y==='number')?y:H*.34; /* v1.6.1: no meio, um pouco pra cima */
+    x=(typeof x==='number')?x:W*.5;y=(typeof y==='number')?y:H*.42;
     game._cerbFight=1;game._rmSent=1;
     boss.active=false;boss.dashing=false;boss.frenzyActive=false;
     try{for(const h of boss.heads){h.alive=false;h.hp=0;h.state='dead';}}catch(e){}
@@ -1261,7 +1259,7 @@ RM.startSentenca=function(x,y){
     RM.c3={
       ph:'transform',t:0,
       x:x,y:y,hopX:x,hopY:y,hopT:0,hop:0,
-      hp:Math.round((2500+(game.threat||0)*130)*c3hpTier()), /* v1.6.1: vida um pouco maior */
+      hp:Math.round((2200+(game.threat||0)*120)*c3hpTier()),
       stage:-1,pat:null,patT:0,patStep:0,patData:{},patShown:{},
       vuln:0,vulnMax:0,rest:0,lab:1,
       necks:[
@@ -1273,8 +1271,8 @@ RM.startSentenca=function(x,y){
       invul:true,glow:0,lastPat:null
     };
     RM.c3.maxHp=RM.c3.hp;
-    /* v1.4.6: 8 BARRAS — a vida total vira 8 barras (uma por spell card) · v1.6.1: 9 no KAIZO */
-    RM.c3.bars=(rmTier().name==='KAIZO'?9:8);RM.c3.barIdx=0;
+    /* v1.4.6: 8 BARRAS — a vida total vira 8 barras (uma por spell card) */
+    RM.c3.bars=8;RM.c3.barIdx=0;
     RM.c3.barMax=Math.max(140,Math.round(RM.c3.maxHp/8));
     RM.c3.hp=RM.c3.barMax;
     try{
@@ -1296,14 +1294,10 @@ const STAGE_NAMES=['DESPERTAR','PERSEGUIÇÃO','TRÊS SENTENÇAS','VERMELHO ABSO
 /* ---- disparo carmesim legível ---- */
 function c3Shoot(x,y,ang,spd,opts){
   opts=opts||{};
-  if(ebullets.length>500)return null; /* v1.4.5 ESPEC §6.5: limite 320→500 */
-  const _b={x:x,y:y,vx:Math.cos(ang)*spd,vy:Math.sin(ang)*spd,
+  if(ebullets.length>500)return; /* v1.4.5 ESPEC §6.5: limite 320→500 */
+  ebullets.push({x:x,y:y,vx:Math.cos(ang)*spd,vy:Math.sin(ang)*spd,
     r:opts.r||6,c:opts.c||'#ff2e55',dmg:opts.dmg||12,rm:1,life:opts.life||9,
-    rmSplit:opts.split||0,rmT:0};
-  ebullets.push(_b);
-  /* v1.6.1: devolve a bala — os padrões novos (chuva/julgamento) anexam
-     comportamentos próprios (b.jg) na bala que acabou de nascer */
-  return _b;
+    rmSplit:opts.split||0,rmT:0});
 }
 function c3Gap(n,gapN,gapW,off){
   /* ângulos com lacunas — devolve lista de ângulos */
@@ -1331,27 +1325,16 @@ const SPELL_NAMES={
   eclipse:'Cão Branco 「Eclipse Carmesim」',
   chuva:'Cão Branco 「Chuva do Último Círculo」',
   sentencas:'Cão Branco 「Três Sentenças」',
-  vermelho:'Cão Branco 「Vermelho Absoluto」',
-  /* v1.6.1: a NONA card — só no KAIZO */
-  julgamento:'Cão Branco 「Julgamento Verdadeiro」'
+  vermelho:'Cão Branco 「Vermelho Absoluto」'
 };
 /* v1.4.5 ESPEC §4.2: duração máxima individual de cada spell card (§7-§14);
    estourou o tempo, a card encerra e avança — sem dano em Thor, sem penalidade. */
-const SPELL_DUR={rosario:18,cruz:18,espiral:20,cacada:18,eclipse:20,chuva:18,sentencas:20,vermelho:24,julgamento:26};
-/* v1.6.0: AS CARDS 6 E 8 PUXAM MAIS — a CHUVA DO ÚLTIMO CÍRCULO e o VERMELHO
-   ABSOLUTO estavam fáceis demais: nelas as salvas ficam mais juntas (iv ÷ fator)
-   e os tiros saem mais rápidos (spd × fator). As outras seis seguem iguais. */
-const SPELL_HARD={chuva:1.18,vermelho:1.18};
+const SPELL_DUR={rosario:18,cruz:18,espiral:20,cacada:18,eclipse:20,chuva:18,sentencas:20,vermelho:24};
 /* v1.4.6: AS 8 BARRAS — cada barra de vida É uma spell card, nesta ordem (a do
    txt): esvaziou a barra, a card quebra, pausa curtíssima (≤2s) e a próxima
    card começa com a barra cheia. A oitava barra (VERMELHO ABSOLUTO) é a última:
    zerou, a sentença morre. */
 const SPELL_ORDER=['rosario','cruz','espiral','cacada','eclipse','chuva','sentencas','vermelho'];
-/* v1.6.1: a NONA SPELL CARD — JULGAMENTO VERDADEIRO, SÓ NO KAIZO: cinco
-   esferas de cores diferentes atiram padrões independentes AO MESMO TEMPO.
-   No kaizo a sentença tem 9 barras (uma por card); nos outros modos, 8. */
-function spellDeck(){return rmTier().name==='KAIZO'?SPELL_ORDER.concat(['julgamento']):SPELL_ORDER;}
-function barCard(c){const D=spellDeck();return D[Math.min(D.length-1,c.barIdx||0)]||'rosario';}
 function patStart(id){
   const c=RM.c3,T=rmTier();
   c.pat=id;c.patT=0;c.patStep=0;c.patData={};
@@ -1360,45 +1343,32 @@ function patStart(id){
   /* v1.4.5 ESPEC §16: a duração máxima cai com a dificuldade (19/18/17/16s) */
   c.patMax=(SPELL_DUR[id]||18)*T.durM;
   if(!c.patShown)c.patShown={};
-  /* v1.6.2: A MENSAGEM DA SPELL CARD APARECE UMA VEZ POR CARD (pedido: "cerberus
-     pode sim reutilizar a spell card, só não aparecer a mensagem de spell card
-     mais de uma vez que for lançada"). Na PRIMEIRA vez: ritual completo — o nome
-     revelado, os pontos carmesins, os pescoços erguendo e o sino. Nas outras: a
-     card entra DIRETO, sem anúncio — o cast de .35s segue como telegrafo. */
-  const _primeira=!c.patShown[id];
-  c.patShown[id]=1;
-  c.cast=.35; /* v1.6.0: ritual mais rápido (.55→.35) — o chefe quase não cala (v1.6.2: o CAST fica SEMPRE — é telegrafo, não mensagem) */
+  if(!c.patShown[id])c.patShown[id]=1;
+  /* v1.4.4: RITUAL DA SPELL CARD — interrupção breve do disparo anterior.
+     O nome é revelado no canto superior direito, pontos carmesins acendem no
+     ar, os pescoços se erguem — e só então o ataque começa. */
+  c.cast=.55;c.spell={name:nomes[id]||id,t:0};
   for(const nk of c.necks)nk.tele=Math.max(nk.tele||0,.55);
-  if(_primeira){
-    c.spell={name:nomes[id]||id,t:0};
-    for(let i=0;i<12;i++)particles.push({x:c.x+rnd(-70,70),y:c.y-rnd(20,150),vx:rnd(-14,14),vy:rnd(-46,-14),life:rnd(.5,1.1),t:0,r:rnd(1.2,2.6),c:i%3?'#ff2e55':'#ff8fa0',drag:.97,glow:true});
-    /* sino distante + cue sonoro por categoria */
-    try{
-      blip('square',1480,960,.18,.05);blip('sine',2240,1780,.34,.035,.03);
-      if(id==='rosario'||id==='cruz')blip('square',1250,1850,.09,.05);
-      if(id==='espiral')blip('sawtooth',260,880,.55,.05);
-      if(id==='chuva'){blip('sine',95,38,.5,.13);noiseSfx(.4,.07,120,'lowpass');}
-      if(id==='cacada')blip('triangle',300,520,.3,.06);
-      if(id==='eclipse')blip('sine',400,120,.8,.07);
-      if(id==='vermelho'){sfx.roar();blip('square',180,640,.6,.09);}
-      if(id==='sentencas')blip('square',900,1400,.12,.05);
-      /* v1.6.1: o sinistro do JULGAMENTO VERDADEIRO — as cinco esferas acendem */
-      if(id==='julgamento'){sfx.roar();blip('sine',60,180,1.2,.12);noiseSfx(1,.08,120,'lowpass');blip('square',1480,2200,.4,.04);}
-    }catch(e){}
-  }else{
-    /* v1.6.2: a card REPETIU — entra sem o anúncio: sem a placa do nome
-       (o c.spell antigo ficaria vivo e mostraria a mensagem de novo) */
-    c.spell=null;
-  }
+  for(let i=0;i<12;i++)particles.push({x:c.x+rnd(-70,70),y:c.y-rnd(20,150),vx:rnd(-14,14),vy:rnd(-46,-14),life:rnd(.5,1.1),t:0,r:rnd(1.2,2.6),c:i%3?'#ff2e55':'#ff8fa0',drag:.97,glow:true});
+  /* sino distante + cue sonoro por categoria */
+  try{
+    blip('square',1480,960,.18,.05);blip('sine',2240,1780,.34,.035,.03);
+    if(id==='rosario'||id==='cruz')blip('square',1250,1850,.09,.05);
+    if(id==='espiral')blip('sawtooth',260,880,.55,.05);
+    if(id==='chuva'){blip('sine',95,38,.5,.13);noiseSfx(.4,.07,120,'lowpass');}
+    if(id==='cacada')blip('triangle',300,520,.3,.06);
+    if(id==='eclipse')blip('sine',400,120,.8,.07);
+    if(id==='vermelho'){sfx.roar();blip('square',180,640,.6,.09);}
+    if(id==='sentencas')blip('square',900,1400,.12,.05);
+  }catch(e){}
 }
 function patFrame(dt){
   const c=RM.c3,T=rmTier(),cx=T.cx;
   /* v1.4.5 ESPEC §4.2: tempo máximo da spell card — estourou, encerra e avança */
   if(c.patT>=(c.patMax||999)){patEnd();return;}
   c.patT+=dt;
-  const hf=SPELL_HARD[c.pat]||1; /* v1.6.0: fator das cards 6 e 8 */
-  const iv=T.int/hf; /* intervalo entre salvas (multiplicador) — v1.6.0: geral mais apertado + fator */
-  const spd=T.spd*hf; /* v1.6.0: velocidade geral + fator */
+  const iv=T.int; /* intervalo entre salvas (multiplicador) */
+  const spd=T.spd;
   const P0=c.patData;
   switch(c.pat){
   case 'rosario':{
@@ -1408,7 +1378,7 @@ function patFrame(dt){
        B = dentes laterais persistentes: arcos da esquerda + linhas diagonais
            pequenas e mais rápidas da direita;
        C = fechamento: 3 anéis a .78s com divisão ±18° nos anéis finais. */
-    const den=1.12+cx*.06; /* v1.6.0: +12% de balas nos anéis do rosário */
+    const den=1+cx*.06;
     /* EVENTO A — anéis triplos com lacunas que alternam (determinístico) */
     const salvas=[0,1.2*iv,2.4*iv];
     if(cx>=1)salvas.push(3.6*iv);
@@ -1468,7 +1438,7 @@ function patFrame(dt){
            a 2ª execução INVERTE a ordem;
        C = cruz quebrada: leque central estreito + dois laterais largos, com a
            abertura migrando para perto do centro (3 combinações). */
-    const den=1.12+cx*.05; /* v1.6.0: +12% (cruz) */
+    const den=1+cx*.05;
     /* EVENTO A — leque central */
     const salvas=[0,.9*iv,1.8*iv];
     if(cx>=1)salvas.push(2.7*iv);
@@ -1667,7 +1637,7 @@ function patFrame(dt){
        D = eclipse total: 2 conjuntos de arcos + anel final RÁPIDO de abertura
            pequena — atravessar pelas aberturas em movimento. */
     if(!P0.t0){P0.t0=1;c.eclipseV=1;}
-    const den=1.12+cx*.05; /* v1.6.0: +12% (eclipse) */
+    const den=1+cx*.05;
     /* EVENTO A — sombra orbital */
     const ondas=[{t:.4,sp:135,n:28,gap:.55,dir:1},{t:1.1*iv,sp:185,n:36,gap:.5,dir:-1},{t:1.8*iv,sp:235,n:44,gap:.45,dir:1}];
     if(cx>=1)ondas.push({t:2.5*iv,sp:290,n:36,gap:.5,dir:-1});
@@ -1728,139 +1698,83 @@ function patFrame(dt){
     if(c.patT>=8.2*iv+2.6){c.eclipseV=0;patEnd();}
     break;}
   case 'chuva':{
-    /* v1.6.1 — A CHUVA REFEITA: a card ALTERNA entre QUATRO FORMAÇÕES.
-       F0  balas ROXAS GRANDES, coladas umas nas outras, que deixam RASTROS
-           VERMELHOS — os rastros se desviam depois em direções variadas;
-       F1  um CÍRCULO de projéteis com rastros, girando ligeiramente p/ ESQUERDA;
-       F2  outro círculo girando p/ DIREITA, rastros como no primeiro ataque;
-       F3  a formação circular anterior se REPETE (F1↔F2 até a card acabar).
-       As balas roxas MIRAM onde o Thor estava no instante do tiro — andar
-       de lado no momento certo faz a onda passar pelo lugar que você deixou. */
-    const seq=[]; /* [t0, formação] — F0 abre, depois os círculos alternam */
-    seq.push([0,0],[1.15,0],[2.5,1],[4.6,2],[6.7,1],[8.8,2],[10.9,1],[13,2],[15.1,1],[17.2,2]);
-    for(const sf of seq){
-      const t0=sf[0]*iv,fm=sf[1],key='f'+sf[0];
-      if(c.patT>=t0&&!P0[key]){
-        P0[key]=1;
-        if(fm===0){
-          /* F0 — AS ROXAS: fileira densa e colada, mirando a posição ATUAL */
-          game.shake=Math.max(game.shake,10);
-          try{blip('sine',150,55,.34,.11);noiseSfx(.25,.06,110,'lowpass');}catch(e){}
-          const n=11,tx=player.x;
-          for(let k=0;k<n;k++){
-            const x=clamp(tx+(k-(n-1)/2)*27,34,W-34);
-            const b=c3Shoot(x,-16,Math.PI/2+rnd(-.05,.05),(245+Math.abs(k-(n-1)/2)*10)*spd,{r:9,c:'#9d6bb5',life:7});
-            if(b)b.jg={t:rnd(.5,.75),n:2,c:'#ff3d5e'}; /* cada roxa solta 2 rastros vermelhos que desviam */
+    /* v1.4.5 ESPEC §12 COMPLETO — SEM PIEDADE:
+       A = 8 posições possíveis, 6 chovem por salva, 2 corredores que MIGRAM a
+           cada salva (3 salvas por ciclo, 3 ciclos, a .78s);
+       B = deslocamento lateral: 3 salvas horizontais de 10 da esquerda, altura
+           mudando a cada uma, enquanto a chuva continua;
+       C = impacto central: o chefe salta ao centro, onda circular com
+           aberturas + duas colunas laterais LENTAS fechando;
+       D = última chuva: 3 salvas diagonais escalonadas em velocidades distintas. */
+    if(!P0.t0){
+      P0.t0=1;
+      game.shake=16;try{blip('sine',120,40,.4,.14);noiseSfx(.35,.08,90,'lowpass');}catch(e){}
+      c.hopX=W*.5+(Math.random()<.5?-1:1)*W*.3;c.hopY=H*.5;c.x=c.hopX;c.y=c.hopY;
+    }
+    /* EVENTO A — chuva em salvas: 6 das 8 posições, corredores migrando */
+    for(let cyc=0;cyc<3;cyc++){
+      for(let sv=0;sv<3;sv++){
+        const t0=cyc*2.6*iv+sv*.78*iv;
+        if(c.patT>=t0&&!P0['s'+cyc+'_'+sv]){
+          P0['s'+cyc+'_'+sv]=1;
+          /* os corredores livres mudam de lugar a cada salva (determinístico);
+             nas altas dificuldades sobra UM corredor só */
+          const l1=(cyc*2+sv)%8,l2=(cyc*2+sv+3)%8;
+          const nlv=cx>=2?1:2;
+          for(let i=0;i<8;i++){
+            if(i===l1||(nlv===2&&i===l2))continue;
+            const x=60+(i+.5)*((W-120)/8);
+            const big=(i+sv+cyc)%3===0;
+            c3Shoot(x,-12,Math.PI/2,(big?230:300)*spd,{r:big?8:5,c:big?'#ff2e55':'#ff5a78'});
           }
-          /* as cabeças laterais completam com leques mirando o Thor */
-          if(!player.dead)for(const nk of[c.necks[1],c.necks[2]]){
-            const a0=Math.atan2(player.y-nk.hy,player.x-nk.hx);
-            for(let k=-1;k<=1;k++)c3Shoot(nk.hx,nk.hy,a0+k*.09,205*spd,{r:5,c:'#c9a0ff'});
-          }
-        }else{
-          /* F1/F2 — OS CÍRCULOS QUE GIRAM: anel duplo (26 balas) com rotação
-             contínua; cada bala solta UM rastro vermelho que desvia depois */
-          const w=(fm===1?-1.05:1.05); /* esquerda / direita */
-          try{blip('sine',fm===1?620:760,fm===1?420:520,.2,.06);}catch(e){}
-          for(let ring=0;ring<2;ring++){
-            const off=ring*Math.PI/2+rnd(TAUx);
-            for(let k=0;k<13;k++){
-              const a=off+k*TAUx/13;
-              const b=c3Shoot(c.x,c.y-40,a,(140+ring*46)*spd,{r:6,c:fm===1?'#c9a0ff':'#b388e8',life:9});
-              if(b)b.jg={w:w,t:rnd(.7,1),n:1,c:'#ff3d5e'};
-            }
-          }
-          /* o miolo crava uma linha no Thor (as balas direcionadas de sempre) */
-          if(!player.dead){
-            const nk=c.necks[0];
-            const a0=Math.atan2(player.y-nk.hy,player.x-nk.hx);
-            for(let k=0;k<3;k++)c3Shoot(nk.hx,nk.hy,a0,250*spd,{});
-          }
+          try{blip('sine',140,60,.16,.06);}catch(e){}
         }
       }
     }
-    if(c.patT>=19.2*iv){c.cols=[];patEnd();}
-    break;}
-  case 'julgamento':{
-    /* v1.6.1 — A NONA SPELL CARD (SÓ NO KAIZO): JULGAMENTO VERDADEIRO.
-       O Cérbero invoca CINCO ESFERAS, cada uma de uma cor, e TODAS atiram
-       SIMULTANEAMENTE, padrões independentes:
-       AZUL      leques de balas direcionados ao Thor;
-       CINZA     círculos de projéteis que também miram o Thor (o anel desliza);
-       AMARELO   balas lentas em direções variadas que PARAM e mudam de direção;
-       VERDE     projéteis que surgem em direções aleatórias e depois DESCEM
-                 na diagonal;
-       VERMELHO  círculos de balas que se CRUZAM.
-       O efeito é a combinação dos padrões independentes — todos ativos ao
-       mesmo tempo, orbitando o Cérbero enquanto o julgamento dura. */
-    if(!P0.sph){
-      P0.sph=[
-        {c:'#5aa0ff',a0:-2.2,ix:0},{c:'#b8b4ac',a0:-.9,ix:1},{c:'#ffd94f',a0:0,ix:2},
-        {c:'#7fd46f',a0:.9,ix:3},{c:'#ff4f3d',a0:2.2,ix:4}
-      ].map(function(s){
-        return{x:c.x+Math.cos(s.a0)*175,y:c.y-30+Math.sin(s.a0)*140,c:s.c,t:rnd(.3,.7),acc:.4,ix:s.ix};
-      });
-      P0.rot=0;
-      game.shake=20;game.flash=.4;
-      try{sfx.roar();blip('sine',60,180,1.2,.12);noiseSfx(1.1,.08,110,'lowpass');}catch(e){}
-    }
-    P0.rot+=dt*.45;
-    const jiv=Math.max(.4,.62*T.int);
-    for(const s of P0.sph){
-      /* as esferas orbitam o chefe, lentas e inevitáveis */
-      const ang=P0.rot+s.ix*TAUx/5;
-      s.x=c.x+Math.cos(ang)*175;
-      s.y=c.y-30+Math.sin(ang)*175*.8;
-      s.t-=dt;
-      if(s.t>0)continue;
-      s.acc-=dt;
-      if(s.acc>0)continue;
-      if(s.c==='#5aa0ff'){ /* AZUL — leques mirando o Thor */
-        s.acc=Math.max(.32,.5*jiv);
-        if(!player.dead){
-          const a0=Math.atan2(player.y-s.y,player.x-s.x);
-          for(let k=-2;k<=2;k++)c3Shoot(s.x,s.y,a0+k*.13,215*spd,{r:5,c:s.c});
-          try{blip('square',980,1400,.06,.04);}catch(e){}
-        }
-      }else if(s.c==='#b8b4ac'){ /* CINZA — círculos que também miram */
-        s.acc=1.35;
-        const a0=(!player.dead)?Math.atan2(player.y-s.y,player.x-s.x):Math.PI/2;
-        const aimX=Math.cos(a0)*52,aimY=Math.sin(a0)*52;
-        for(let k=0;k<14;k++){
-          const a=k/14*TAUx;
-          const b=c3Shoot(s.x,s.y,a,118*spd,{r:5,c:s.c});
-          if(b){b.vx+=aimX;b.vy+=aimY;}
-        }
-        try{blip('sine',700,420,.09,.05);}catch(e){}
-      }else if(s.c==='#ffd94f'){ /* AMARELO — lentas que param e mudam */
-        s.acc=.72;
-        for(let k=0;k<3;k++){
-          const b=c3Shoot(s.x,s.y,rnd(TAUx),92*spd,{r:6,c:s.c,life:10});
-          if(b)b.jg={stop:rnd(.8,1.4),mode:Math.random()<.6?'aim':'rand'};
-        }
-        try{blip('sine',1300,900,.05,.03);}catch(e){}
-      }else if(s.c==='#7fd46f'){ /* VERDE — aleatórias que descem na diagonal */
-        s.acc=.9;
-        for(let k=0;k<4;k++){
-          const b=c3Shoot(s.x,s.y,-Math.PI/2+rnd(-1.4,1.4),150*spd,{r:5,c:s.c,life:10});
-          if(b)b.jg={fall:rnd(.7,1.05)};
-        }
-        try{blip('triangle',620,380,.06,.04);}catch(e){}
-      }else{ /* VERMELHO — círculos de balas que se CRUZAM */
-        s.acc=1.5;
-        for(const sgn of[-1,1]){
-          const px=clamp(s.x+sgn*95,30,W-30);
-          const dir=sgn>0?Math.PI:0; /* cada anel viaja para o lado do outro */
-          for(let k=0;k<11;k++){
-            const a=k/11*TAUx;
-            const b=c3Shoot(px,s.y,a,0.01,{r:5,c:s.c});
-            if(b){b.vx=Math.cos(a)*95*spd+Math.cos(dir)*130*spd;b.vy=Math.sin(a)*95*spd+Math.sin(dir)*130*spd;}
-          }
-        }
-        try{blip('sine',180,90,.14,.07);}catch(e){}
+    /* EVENTO B — deslocamento lateral (3 salvas horizontais, altura muda) */
+    const lat=[2.2*iv,3.1*iv,4.0*iv];
+    for(let s=0;s<3;s++){
+      if(c.patT>=lat[s]&&!P0['l'+s]){
+        P0['l'+s]=1;
+        /* v1.4.6: a chuva lateral vem das TRÊS CABEÇAS ao mesmo tempo —
+           leques espelhados + a central cravando uma linha em Thor */
+        const esq=c.necks[1];
+        const ty=H*(.4+s*.12); /* altura gradualmente diferente */
+        const a0=Math.atan2(ty-esq.hy,W*.2-esq.hx);
+        for(let k=0;k<10;k++)c3Shoot(esq.hx,esq.hy,a0+(k-4.5)*.05,205*spd,{c:'#ff8fa0'});
+        const dirH=c.necks[2];
+        const a0d2=Math.atan2(ty-dirH.hy,(W*.8)-dirH.hx);
+        for(let k=0;k<10;k++)c3Shoot(dirH.hx,dirH.hy,a0d2-(k-4.5)*.05,205*spd,{c:'#ff8fa0'});
+        const cenH=c.necks[0];
+        const a0c=Math.atan2(player.y-cenH.hy,player.x-cenH.hx);
+        for(let k=-1;k<=1;k++)c3Shoot(cenH.hx,cenH.hy,a0c+k*.07,240*spd,{});
+        esq.g=dirH.g=cenH.g=.5;
+        try{blip('square',1100,1600,.1,.05);}catch(e){}
       }
     }
-    /* a card dura até o patMax (26s × durM) — o patMax encerra sozinho */
+    /* EVENTO C — impacto central (5.2s): salto → onda + colunas fechando */
+    if(c.patT>=5.2&&!P0.imp){P0.imp=1;c.hopX=W*.5;c.hopY=H*.52;c.x=c.hopX;c.y=c.hopY;c.hop=.5;}
+    if(c.patT>=5.9&&!P0.imp2){
+      P0.imp2=1;
+      shockwaves.push({x:c.x,y:c.y+40,r:10,vr:520,maxR:130,t:0,dur:.4,c:'#ff2e55'});
+      const angs=c3Gap(26,2,.5,rnd(TAUx));
+      for(const a of angs)c3Shoot(c.x,c.y-40,a,190*spd,{});
+      /* duas colunas laterais que se aproximam lentamente do centro */
+      c3Shoot(30,H*.5,0,120*spd,{r:9,c:'#ff2e55'});
+      c3Shoot(W-30,H*.5,Math.PI,120*spd,{r:9,c:'#ff2e55'});
+      try{blip('sine',95,38,.5,.13);noiseSfx(.4,.07,120,'lowpass');}catch(e){}
+    }
+    /* EVENTO D — última chuva: 3 salvas diagonais escalonadas */
+    const diag=[7.4,8.0,8.6];
+    const dAng=[-.62,-Math.PI/2,-2.5];
+    for(let s=0;s<3;s++){
+      if(c.patT>=diag[s]&&!P0['d'+s]){
+        P0['d'+s]=1;
+        for(let k=0;k<9;k++)c3Shoot(60+k*((W-120)/8),-14,dAng[s]+(k-4)*.07,(240+s*30)*spd,{r:5,c:'#ff5a78'});
+        try{blip('square',900,1400,.1,.05);}catch(e){}
+      }
+    }
+    if(c.patT>=9.4){c.cols=[];patEnd();}
     break;}
   case 'sentencas':{
     /* v1.4.5 ESPEC §13 COMPLETO — SEM PIEDADE:
@@ -1966,7 +1880,7 @@ function patFrame(dt){
        F = última sentença: pausa de .6s → leque → espiral → linha convergente;
        G = vermelho absoluto: 4 combinações crescentes + 3 arcos finais. */
     if(!P0.t0){P0.t0=1;P0.a1=rnd(TAUx);P0.a2=rnd(TAUx);P0.a3=rnd(TAUx);}
-    const den=1.22+cx*.05; /* v1.6.0: card 8 — +22% de balas no vermelho absoluto */
+    const den=1+cx*.05;
     /* EVENTO A — firmamento carmesim (2 rodadas × 3 arcos a .45*iv) */
     for(let r=0;r<2;r++){
       const arcs=[[0,5,235,'#ff2e55',4],[1,9,180,'#ff8fa0',6],[2,6,125,'#ff5a78',8]];
@@ -2112,22 +2026,6 @@ function patFrame(dt){
     }
     if(c.patT>=25.4*iv+2.6)patEnd();
     break;}
-case 'base':{
-  /* v1.6.1: O FÔLEGO — leque curto de 5 tiros âmbar do pescoço da vez, no
-     ritmo base. Sem ritual, sem placa — só o fôlego entre dois julgamentos. */
-  c.fbAcc=(c.fbAcc||0)+dt;
-  if(c.fbAcc>=Math.max(.55,.72*T.int)){
-   c.fbAcc=0;
-   c.patStep++;
-   const nk=c.necks[c.patStep%3];
-   const sx2=nk.g>0?nk.hx:c.x,sy2=nk.g>0?nk.hy:c.y-70;
-   if(!player.dead){
-    const a0=Math.atan2(player.y-sy2,player.x-sx2);
-    for(let k=-2;k<=2;k++)c3Shoot(sx2,sy2,a0+k*.11,190*spd,{r:5,c:'#ffd9a0'});
-    try{blip('square',700,940,.06,.04);}catch(e){}
-   }
-  }
-  break;}
   default:patEnd();
   }
 }
@@ -2138,18 +2036,10 @@ function patEnd(){
      janela vulnerável de 2.6s, um respiro curto (telegrafado pelo propio ritmo)
      e o próximo padrão já começa: é um bullet hell de verdade agora. */
   c.vuln=0;c.vulnMax=0;
-  /* v1.6.0: o respiro entre cards encolheu (.66→.5 do intervalo) e ganhou
-     teto duro de 1s — as balas nunca param por mais que ~1,4s contando o ritual */
-  c.rest=Math.min(1,Math.max(.3,.5*T.int));
+  c.rest=Math.max(.3,.66*T.int);
   try{window.__MUSIC_ZONE='sentenca'+Math.max(0,c3Stage());}catch(e){}
 }
 /* escolha do padrão por etapa */
-function startFiller(c){
-  /* v1.6.1: O FÔLEGO — tiros base modestos entre uma card e outra: a sentença
-     nunca fica muda, mas também NUNCA repete um julgamento que já aconteceu */
-  c.pat='base';c.patT=0;c.patStep=0;c.patData={};
-  c.patMax=999;c.patName=null;c.spell=null;c.cast=0;
-}
 function nextPattern(){
   const c=RM.c3,st=c.stage;
   let pool;
@@ -2247,7 +2137,7 @@ function c3Frame(dt){
       c.hop=0;
       /* v1.4.6: a primeira spell card é a da BARRA atual (dano na transformação
          pode ter adiantado a fila) */
-      patStart(barCard(c)); /* v1.6.1: a card da BARRA (9 no kaizo) */
+      patStart(SPELL_ORDER[Math.min(7,c.barIdx||0)]||'rosario'); /* anéis lentos e separados (com telegrafia) */
     }
     /* v1.4.6: “faça ele sempre tomar dano” — a partir do clarão (t≥2.2) a
        silhueta em transformação já sangra: atirar nela SEMPRE conta */
@@ -2279,21 +2169,17 @@ function c3Frame(dt){
   if(c.rest>0){
     c.rest-=dt;
     if(c.rest<=0&&c.stage>=1&&Math.random()<.5){
-      /* salto para nova posição (telegrafado pela sombra) — v1.6.1: o salto
-         prefere o MEIO PRA CIMA da arena (sobra espaço embaixo pra dançar) */
-      const m={x:150,y:110,w:W-300,h:Math.round(H*.44)};
+      /* salto para nova posição (telegrafado pela sombra) */
+      const m={x:130,y:150,w:W-260,h:H-260};
       c.hopX=clamp(m.x+Math.random()*m.w,m.x,m.x+m.w);
       c.hopY=clamp(m.y+Math.random()*m.h,m.y,m.y+m.h);
       c.hop=.8;
     }
   }
   if(c.rest<=0&&!c.pat&&!(c.hop>0)){
-    /* v1.4.6: a spell card é a da BARRA · v1.6.2: A CARD PODE SE REPETIR — o
-       Cérberus reutiliza a card da barra quantas vezes precisar (o padrão
-       continua até a barra quebrar); o que NÃO se repete é a MENSAGEM: cada
-       card anuncia o nome UMA vez (a primeira), nas outras entra sem ritual.
-       patStart já faz o gate interno pela patShown. */
-    patStart(barCard(c));
+    /* v1.4.6: a spell card é a da BARRA — quando o padrão da card acaba, ele
+       RECOMEÇA (sempre atacando); a card só troca quando a barra esvazia */
+    patStart(SPELL_ORDER[Math.min(7,c.barIdx||0)]||nextPattern());
   }
   /* v1.4.5 ESPEC §10: histórico curto das posições de Thor (atual · ~0,25s
      atrás · ~0,5s atrás) — a CAÇADA SEM RASTRO atira para onde você esteve.
@@ -2393,20 +2279,18 @@ function c3Frame(dt){
    de .55s = ~1.65s, dentro dos 2s pedidos). Foi a última barra: morte. */
 function barAdvanceOrDeath(){
   const c=RM.c3;if(!c)return;
-  /* v1.6.1: a última barra é a bars-1 (9 no kaizo — a nona é o JULGAMENTO) */
-  if((c.barIdx||0)>=c.bars-1){c3Death();return;}
+  if((c.barIdx||0)>=7){c3Death();return;}
   barUp();
 }
 function barUp(){
   const c=RM.c3;if(!c)return;
-  c.barIdx=Math.min(c.bars-1,(c.barIdx||0)+1);
+  c.barIdx=Math.min(7,(c.barIdx||0)+1);
   c.hp=c.barMax;
   c.pat=null;c.patData={};
   c.marks=[];c.cols=[];c.ringFx=[];
   c.rest=1.1; /* pausa entre cards — nunca maior que 2s */
-  /* v1.6.2: patShown NÃO reseta aqui — a mensagem de cada spell card é UMA
-     só por luta inteira, mesmo a card voltando em outra barra (pedido) */
-  rmTxt('SPELL CARD '+((c.barIdx||0)+1)+'/'+c.bars,c.x,c.y-186,15,'#ff2e55');
+  c.patShown={};
+  rmTxt('SPELL CARD '+((c.barIdx||0)+1)+'/8',c.x,c.y-186,15,'#ff2e55');
   rmTxt('a barra quebrou — a próxima sentença chega',c.x,c.y-166,9,'#ffd9a0');
   game.shake=Math.max(game.shake,10);game.flash=Math.max(game.flash,.22);
   try{blip('square',1700,640,.34,.09);noiseSfx(.3,.07,300,'bandpass');sfx.ehit();}catch(e){}
@@ -2567,7 +2451,7 @@ function rmDrawSpellCard(){
     /* losangos rituais nas laterais */
     ctx.fillStyle='#ff2e55';
     for(const dx of[10,w-10]){ctx.save();ctx.translate(x+dx,y+27);ctx.rotate(Math.PI/4);ctx.fillRect(-2.4,-2.4,4.8,4.8);ctx.restore();}
-    txt('SPELL CARD ' +((c.barIdx||0)+1)+'/'+(c.bars||8),x+26,y+16,MONO,9,'#ff8fa0','left',2);
+    txt('SPELL CARD ' +((c.barIdx||0)+1)+'/8',x+26,y+16,MONO,9,'#ff8fa0','left',2);
     txt(nm,x+26,y+38,DISP,14,'#fdfbf4','left',3);
     ctx.restore();
   }catch(e){}
@@ -2578,24 +2462,23 @@ function rmDrawSentBar(){
     const y=40,t=1;
     const total=640,x0=W/2-total/2,h=13;
     txt('CERBERUS — O CÃO NEGRO DO JUÍZO CARMESIM',W/2,y-11,MONO,11,'#ff8fa0','center',3); /* v1.5.7: o nome da segunda apresentação */
-    txt(STAGE_NAMES[Math.max(0,c3Stage())]+'  ·  CARD '+((c.barIdx||0)+1)+'/'+(c.bars||8),W/2,y+26,MONO,9,c.stage>=3?'#ff2e55':'#e6dac4','center',3);
+    txt(STAGE_NAMES[Math.max(0,c3Stage())]+'  ·  CARD '+((c.barIdx||0)+1)+'/8',W/2,y+26,MONO,9,c.stage>=3?'#ff2e55':'#e6dac4','center',3);
     ctx.strokeStyle='rgba(255,143,160,.6)';ctx.lineWidth=1.5;
     ctx.strokeRect(x0,y,total,h);
     /* v1.4.6: a barra mostra a spell card ATUAL (cada card = 1 barra cheia);
-       as divisões marcam as barras da sentença (v1.6.1: 9 no kaizo) */
+       8 divisões marcam as 8 barras da sentença */
     const r=clamp(c.hp/(c.barMax||c.maxHp),0,1);
     const g=ctx.createLinearGradient(x0,0,x0+total,0);
     g.addColorStop(0,'#ff2e55');g.addColorStop(1,'#ff8fa0');
     ctx.fillStyle=g;ctx.fillRect(x0+1.5,y+1.5,Math.max(0,(total-3)*r),h-3);
-    /* divisões das barras — a atual brilha, as quebradas ficam apagadas */
-    const NB=c.bars||8;
-    for(let s=1;s<NB;s++){
-      const sx=x0+total*s/NB;
+    /* divisões das 8 barras — a atual brilha, as quebradas ficam apagadas */
+    for(let s=1;s<8;s++){
+      const sx=x0+total*s/8;
       ctx.fillStyle='rgba(10,7,8,.85)';ctx.fillRect(sx,y+1.5,2,h-3);
     }
     /* barras já vencidas: risco carmesim escuro por cima (memória do juízo) */
-    for(let s=0;s<Math.min(NB,c.barIdx||0);s++){
-      const sx0=x0+total*s/NB+2,sw=total/NB-4;
+    for(let s=0;s<Math.min(8,c.barIdx||0);s++){
+      const sx0=x0+total*s/8+2,sw=total/8-4;
       ctx.fillStyle='rgba(120,22,42,.55)';ctx.fillRect(sx0,y+h-3.5,sw,2);
     }
   }catch(e){}
@@ -2772,20 +2655,6 @@ function c3Draw(){
 function rmDrawOver(){
   try{
     if(RM.c3)c3Draw();
-    /* v1.6.1: as CINCO ESFERAS do JULGAMENTO VERDADEIRO — cada uma do seu
-       cor, pulsando, orbitando o Cérbero enquanto todas atiram juntas */
-    if(RM.c3&&RM.c3.pat==='julgamento'&&RM.c3.patData&&RM.c3.patData.sph){
-      for(const s of RM.c3.patData.sph){
-        const pul=.75+.25*Math.sin(game.t*6+s.ix*2.1);
-        ctx.save();
-        const g=ctx.createRadialGradient(s.x,s.y,2,s.x,s.y,27*pul);
-        g.addColorStop(0,'#fffdf4');g.addColorStop(.35,s.c);g.addColorStop(1,'rgba(0,0,0,0)');
-        ctx.fillStyle=g;ctx.beginPath();ctx.arc(s.x,s.y,27*pul,0,TAUx);ctx.fill();
-        ctx.strokeStyle='rgba(255,255,255,.5)';ctx.lineWidth=1.2;
-        ctx.beginPath();ctx.arc(s.x,s.y,9*pul,0,TAUx);ctx.stroke();
-        ctx.restore();
-      }
-    }
     /* v1.5.6: A MENSAGEM VERMELHA — “oh cão, voce cometeu um grave erro” —
        pulsa sobre a cena (fase-independent: acompanha o início do remake) */
     if(RM.c3&&RM.c3.avisoT>0){
@@ -2913,12 +2782,13 @@ RM.resetRun=function(){
   /* camada de chão */
   if(E.drawFloor){const _df=E.drawFloor;E.drawFloor=function(){_df();rmDrawFloor();};}
 })();
-/* spawn: nome apagado + aposta do carrasco */
+/* spawn: nome apagado + aposta do carrasco
+   v1.6.4: repassa o hpMul (A CORTE DUPLA — o gêmeo nasce com 80% da vida) */
 (function wireSpawn(){
   if(typeof spawnEnemy!=='function')return;
   const _se=spawnEnemy;
-  spawnEnemy=function(type,x,y,kaizo){
-    const e=_se(type,x,y,kaizo);
+  spawnEnemy=function(type,x,y,kaizo,hpMul){
+    const e=_se(type,x,y,kaizo,hpMul);
     try{
       if(e){
         if(game.rm_nome)e._nome=1.2;
@@ -2981,7 +2851,7 @@ window.__RM_TEST={
       if(RM.c3)return'already';
       game._cerbFight=1;game._rmSent=1;boss.active=false;
       RM.c3={ph:'fight',t:0,x:W*.68,y:H*.46,hopX:W*.68,hopY:H*.46,hop:0,
-        hp:2500,maxHp:2500,stage:-1,pat:null,patT:0,patStep:0,patData:{},patShown:{},
+        hp:2200,maxHp:2200,stage:-1,pat:null,patT:0,patStep:0,patData:{},patShown:{},
         vuln:0,vulnMax:1,
         necks:[{i:0,rise:0,base:0,a:Math.PI/2,g:0,sp:0,hx:W*.68,hy:H*.46-160,mouth:0,tele:0},
                {i:1,rise:0,base:-.85,a:Math.PI/2-.85,g:0,sp:0,hx:W*.68-90,hy:H*.46-130,mouth:0,tele:0},

@@ -1,159 +1,476 @@
-# THOR REVENGE — v1.6.5 "O ATALHO AO CINZA" (v52: botão novo no menu —
-# O LIMBO CINZA · TESTE: escolha a arma e caia DIRETO na ÚLTIMA fase do
-# limbo...? (a fase 4) sem descer andar nenhum: mapa esvaziado, a aura
-# dourada vazando da porta do chefe, a placa do primeiro pecado e o buraco
-# da luxuria no fim. O caminho normal segue EXATAMENTE igual. Todo o resto
-# da v1.6.4 intacto: hitbox de um tiro (5), ponto vermelho só no SHIFT,
-# só a placa no limbo...? (a luta da ganancia segue DORMANTE), limbo cinza
-# no chão, NEO KAIZO, bosses kaizo como o bruxo, spell card com anúncio
-# único por card)
+# THOR REVENGE — v1.9.2 "O LIVRO VIVO · A INTRODUÇÃO CINEMATOGRÁFICA" (v60: CÍRCULOS fecha o livro e mostra
+# a LOUSA — os nove círculos desenhados a giz, cada ciclo no seu anel, e UM círculo
+# fora do desenho: a PENUMBRA DAS ALMAS · cada opção vira uma folha com aproximação
+# de câmera própria · MENU MAIS LEVE: o mundo atrás do menu não é mais desenhado,
+# velas/poeira dormem quando outra tela cobre o livro, capa sem filter por quadro ·
+# todo o resto do livro vivo v58 continua: capa com lombada, conteúdo JÁ ESCRITO,
+# registro das almas, página de ajustes, abertura pulável, ANIMAÇÕES DO LIVRO ·
+# EDITOR DE MODS segue fora do jogo — a forja é o mod-studio.html)
 
-## NOVO (v52 / v1.6.5) — O ATALHO AO CINZA
+## NOVO (v60 / v1.9.2) — A INTRODUÇÃO CINEMATOGRÁFICA (intro.js)
+Depois da abertura do livro, a câmera MERGULHA no manuscrito e a história proibida se
+torna real: a prancha do grande abismo, o Inferno registrado em camadas (muralhas,
+portas fechadas, silhuetas na fumaça), as frases nas margens ("Toda queda tem um
+começo." / "Nem toda alma chega ao fim de sua jornada."), a região quase vazia onde
+THOR — o cachorro morto-vivo — acorda com peso (ergue a cabeça, olha os próprios
+membros, silêncio) e caminha para a passagem; a câmera volta ao livro (a ilustração
+mudou; a anotação registra "O corpo foi perdido. A vontade permaneceu."), a marca de
+tinta aparece sozinha na margem ("ele acordou.") e o desenho vira o mundo — o papel
+some, os traços ganham volume, a paleta fria da Penumbra assume. O THOR REVENGE
+revela-se sobre o corredor final com o INICIAR abaixo.
+· ~45s na primeira apresentação; PULÁVEL (clique/tecla/roda, dica discreta no canto).
+· Não repete automaticamente (thorCineSeen); "rever a introdução" fica na ENTRADA.
+· Respeita ANIMAÇÕES DO LIVRO=DESLIGADAS, mudo e volumes; dorme com a aba oculta.
+· Zero sobras: loop morto no fim, canvas removido, áudio encerrado.
+· Arquitetura: UM canvas #cineCv com UM rAF próprio; toda a arte pré-renderizada 1×
+  (prancha 1280×2000, chão, corredor, livro, grão, vinheta); palco 1280×720 cover-fit
+  (qualquer resolução); duração por dt real (teto .25s); watchdog próprio.
+· Pure incremental: zero mudança em gameplay, saves, lousa, handlers e sprites.
 
-- **O BOTÃO O LIMBO CINZA · TESTE** (ao lado do PORTÃO DO CÉRBERUS · TESTE,
-  no menu): escolha a arma e o Thor nasce **direto na fase 4 do Limbo** — a
-  última fase do limbo cinza ("o limbo...?"), sem Penumbra, sem Cérbero, sem
-  Caronte, sem corredor, sem descer andar nenhum.
-- **O QUE VOCÊ CONFERE NELE**: o chão cinza desenhado morto (o limbo cinza é
-  terreno de verdade, não filtro), inimigos raros e fracos (ameaça pela
-  metade), a **aura dourada vazando da porta do chefe** quando o quarto
-  extra se abre, a **sala do primeiro pecado** com a placa ([Z] lê, [Z]
-  sai) e o **buraco da luxuria** abrindo direto → o fim dos círculos (modo
-  infinito ou menu).
-- **NADA mecânico mudou**: é só um palco de teste, como o do portão — o
-  caminho normal do jogo segue EXATAMENTE igual; a luta da ganancia segue
-  DORMANTE atrás de `GANANCIA_LUTA` esperando os sprites e os diálogos.
+## NOVO (v59 / v1.9.1) — A LOUSA DOS CÍRCULOS + MENU MAIS LEVE
 
-## v51 (v1.6.4) — O PONTO NO SHIFT (histórico — intacto na v1.6.5)
+- **A LOUSA**: clicar CÍRCULOS fecha o livro devagar (capa com peso) e mostra a
+  lousa de giz: os NOVE anéis concêntricos com cada ciclo no seu anel (os mortos
+  riscados a giz vermelho), PARAÍSO em cima, LIMBO embaixo — e **UM círculo FORA
+  do desenho: a PENUMBRA DAS ALMAS** (a descida começa ali). I — ABISMO continua
+  com o cartão de giz "descer direto, sem levar nada"; a porta da ESCOLA continua
+  existindo (o jogo decide quando mostrar). Ao sair da lousa, o livro REABRE
+  sozinho e a câmera volta pra casa. Arte estática em SVG (filtro de giz
+  rasterizado 1×) — zero custo por quadro; IDs preservados (circlePenumbra/
+  circleLimbo/circleEscola/circlesBack) — os handlers originais seguem mandando.
+- **CADA OPÇÃO = UMA FOLHA + POSE PRÓPRIA**: ALMAS (1.16×, esquerda da página
+  direita), INVENTÁRIO (1.09×), GRIMÓRIO (1.19×, página esquerda), CONTINUAR vira
+  a folha marcada e MERGULHA (1.3×), MODS RECUA a câmera (folha solta maior) —
+  e a câmera só volta pra casa quando a tela abre por cima fecha.
+- **MENU MAIS LEVE (não trava)**: o loop do jogo NÃO desenha mais o mundo atrás
+  do menu (o livro cobre a tela — o render volta no mesmo tick ao sair); velas e
+  poeira DORMEM quando a lousa/mapa/lista/opções cobrem o livro; a capa em
+  movimento usa uma classe CSS de sombra (sem filter re-pintado por quadro); poeira
+  em canvas menor (12 motas, a cada 3 quadros); largura da câmera em cache.
 
-- **A HITBOX DIMINUIU**: de volta ao **tamanho de um tiro** (8→5) — o corpo
-  visual do Thor continua valendo para portas, itens e empurrões, mas o que
-  **RECEBE dano** voltou a ser o alvo minúsculo do estilo bullet hell.
-- **O PONTO VERMELHO SÓ APARECE SEGURANDO SHIFT**: sem a tecla, **NADA** de
-  disco sobre o Thor; segurando **SHIFT** (o foco, v1.4.6 — com o passo
-  lento), o ponto carmesim desenha **POR CIMA do corpo** com o **tamanho
-  exato da hitbox** + os anéis pulsantes ao redor — o que você vê é
-  exatamente onde o dano acontece. O disco continua desenhado DEPOIS do
-  sprite/PNG (nunca mais escondido embaixo do Thor).
-- **NADA mais mudou**: só a placa no limbo...? (a luta da ganancia segue
-  DORMANTE atrás de `GANANCIA_LUTA`), o limbo cinza desenhado no chão (sem
-  filtro), o boss repetido segue NEO KAIZO, os bosses kaizo seguem com o
-  motor do bruxo e a mensagem da spell card segue única por card.
+## NOVO (v58 — histórico) — O LIVRO VIVO
 
-## v50 (v1.6.3) — SÓ A PLACA (histórico — intacto na v1.6.5)
+- **O LIVRO FÍSICO**: mesa de carvalho pintada 1× (canvas estático), duas velas com
+  chamas a 11 fps, 16 motas de poeira, capa de couro com lombada/✠ que abre com peso
+  (dip de mão, assentamento, primeira folha) e **conteúdo já escrito nas páginas** —
+  sem tela vazia em nenhum momento. Pule com um clique/tecla; da 2ª visita a abertura
+  fica curta; `prefers-reduced-motion` pula direto.
+- **INTERAÇÃO POR OPÇÃO**: DESCER vira a página do mapa desenhado a tinta; RETORNAR
+  volta ao REGISTRO DAS ALMAS (saves = inscrições com nome/karma/estado — carregar,
+  renomear, queimar, restaurar cinza, exportar/importar, com zoom da câmera na folha);
+  OPÇÕES pousa "Das Marcas e Ajustes" (controles como anotações, sliders de tinta);
+  CÍRCULOS/ALMAS/INVENTÁRIO/GRIMÓRIO ganham folha rápida + pousada própria; MODS
+  entra como folha solta; ABANDONAR fecha o livro devagar (e reabre com a despedida).
+- **ENGENHARIA**: câmera 3D por transform (GPU), folha com dobra/sombra, easing real,
+  UMA transição por vez + watchdog — o menu nunca fica travado; teclado (Tab/Enter)
+  intacto; o menu pode abrir/fechar quantas vezes for sem duplicar nada.
+- **DESEMPENHO**: UM loop rAF para tudo que DORME quando o menu sai da tela/aba
+  oculta; velas 11 fps em canvases 40×58; poeira a cada 2 quadros; nada de
+  blur/filter por quadro; mapa tinta pré-renderizado 1×.
+- **ANIMAÇÕES DO LIVRO**: opção nova (COMPLETAS/LEVES/DESLIGADAS) nas OPÇÕES.
+- **O EDITOR DE MODS SAIU DO JOGO**: mods.js ficou com O GERENCIADOR (importar o
+  JSON do studio, ativar/desativar/exportar/excluir + abrir o studio) — o motor
+  segue rodando mods importados (balas, 8 formatos, padrões, spell cards, máquinas,
+  sprites, buff/nerf). mods.js: 3066 → ~860 linhas, runtime intacto.
 
-- **A GANANCIA NÃO MATERIALIZA (ainda)**: a sala do primeiro pecado voltou a
-  ter SÓ a placa — lida a placa ([Z]) e saído da leitura ([Z]), o buraco rosa
-  da **luxuria** se abre DIRETO (sem luta, sem banner, sem roubo) → "fim dos
-  circulos por um momento" (MODO INFINITO ou menu), como na v1.6.1.
-- **A LUTA FICA DORMANTE, NÃO MORTA**: toda a luta da v1.6.2 (anéis de
-  moedas, mãos do tesouro, dízimo, o puxão da avareza e o roubo no final)
-  continua no código atrás da flag `GANANCIA_LUTA` em expansion.js — quando
-  os sprites e os diálogos do primeiro pecado ficarem prontos, basta ligá-la
-  (`const GANANCIA_LUTA=true`) e o boss materializa de novo, inteiro.
-- **A aura dourada segue**: a placa segue dourada e viva no mundo cinza, o
-  texto EXATO dela segue lá, e o JUIZ segue intacto (o laboratório invoca).
+# THOR REVENGE (v57 — histórico: 100 novos itens com efeitos 100 novos itens com efeitos
+# reais — 34 bênçãos · 33 pactos · 33 armas · FEIXES raríssimos com dano por TICK a
+# cada 5 quadros sem acúmulo · pactos bem mais difíceis de selar · inimigos aplicam
+# queimadura/veneno/lentidão ao Thor · IA com antecipação e encurralamento, Coisa de
+# Cervo mais lenta que o jogador · ZERO drenagem passiva de vida · 15 sinergias
+# centrais + 8 de feixe · MAGIKA com sorteio por descida · menu-livro com abertura
+# animada · MOD STUDIO EXTERNO mod-studio.html)
 
-## v49 (v1.6.2) — O PECADO DA GANANCIA (histórico — desde a v1.6.3 a luta
-## está DORMANTE: a sala tem só a placa)
+## NOVO (v57 / v1.9.0) — O GRIMÓRIO DAS CEM ALMAS
 
-- **A GANANCIA MATERIALIZA**: ler a placa e sair da leitura ([Z], [Z]) invoca
-  o primeiro pecado — **o boss do "limbo?" 2 é ELE**: uma moeda viva de olho
-  vermelho, sorriso faminto e moedas orbitando, com luta frenética própria:
-  **anéis de moedas com brechas** + leques mirando; as **mãos do tesouro**
-  (zonas telegrafadas que detonam em ouro); a **cortina do dízimo** varrendo a
-  sala; e o **puxão da AVAREZA** — um fio de ouro que ARRASTA o Thor até ele.
-- **ELE ROUBA TUDO SEU**: vencida a luta, ele estende as mãos e DRENA tudo —
-  as almas, o que caiu no chão e metade da vida — e some rindo. Aí sim o
-  buraco rosa da **luxuria** se abre → "fim dos circulos por um momento"
-  (MODO INFINITO ou menu), como antes.
-- **O PONTO VERMELHO É A HITBOX**: a hitbox de dano SUBIU (5→8) e o disco
-  vermelho agora é desenhado **POR CIMA do corpo** (antes nascia embaixo do
-  sprite — por isso ninguém via) e o tamanho dele é o EXATO da hitbox.
-  Sempre visível; segurando SHIFT ele pulsa com anéis de foco.
-- **O LIMBO CINZA NÃO É MAIS UM FILTRO**: o filtro de saturação saiu — o cinza
-  nasce NO CHÃO: grama desenhada morta (tons cinza), SEM flores, cinza
-  acumulada e tufos secos espalhados; as estruturas religiosas desenham SEM
-  COR. Balas, inimigos e o Thor seguem com as cores deles.
-- **NEO KAIZO**: no MODO KAIZO, o boss que REPETE se apresenta como
-  **NEO KAIZO — [nome]** ("a forma branca, acelerada de novo").
-- **TODOS OS BOSSES KAIZO COMO O BRUXO**: carrasco, viúva e golem ganharam o
-  motor completo do bruxo — **FASE II aos 50% de vida**, os padrões
-  exclusivos que existiam no código mas nunca atiravam agora entram no
-  sorteio com telegrafo (guilhotinas/corrente/execução; teias/ninhada/laço;
-  fissuras/tempestade/núcleo), um **QUARTO padrão novo para cada** (O PACTO,
-  O FERRO, O CASULO, A PIRA), **combos encadeados** e **cadência frenética**
-  (0.55s entre ataques, 0.72× na Fase II, 0.5× no NEO) — o modo kaizo é um
-  bullet hell de verdade.
-- **A MENSAGEM DA SPELL CARD É UMA SÓ**: o Cérberus PODE reutilizar a card da
-  barra (o padrão continua até a barra quebrar); o que não se repete é o
-  ANÚNCIO — cada card revela o nome UMA vez (ritual completo na primeira,
-  entra direto nas outras, com o cast de .35s como telegrafo).
+- **CEM ITENS NOVOS (grimoria.js)**: 34 BÊNÇÃOS (Selo da Vigília bloqueia 1 golpe
+  por sala; Dente do Veredito empilha marcas e detona a cada 6; Rosário Partido
+  encurta efeitos negativos; Seis portas de recompensa em dobro…), 33 PACTOS (risco
+  claro, vantagem real — e NENHUM drena vida: Juros de Sangue paga 20 de vida máxima
+  UMA vez, na hora; Contrato de Vidro troca dano por dano recebido ×1.5…) e 33
+  ARMAS (Agulhas do Escrivão, Martelo do Juízo, Lâmina Bumerangue, Tinta Abissal,
+  Coroa Giratória, Roda do Inferno, Arpão das Almas, Pêndulo do Carrasco…).
+- **FEIXES**: Feixe do Primeiro Pecado (q5, depois da 1ª descida) e Raio do Último
+  Julgamento (q6, depois da 2ª). Segure o disparo: dano por TICK a cada 5 quadros
+  (temporizador acumulado — independente do FPS), o dano NUNCA acumula por
+  permanecer no alvo, a carga é só visual, e cada alvo alinhado recebe
+  independentemente. 8 sinergias exclusivas de feixe (agulhas, relógio, vitral,
+  selo, coroa, cálice, máscara, arpão).
+- **PACTOS MAIS DIFÍCEIS**: peso ×0.35 nas cartas, 15% no chão, fora do básico da
+  feira (e 25% na rara), o altar de sangue cobra 30 de vida e escala +10 por uso.
+- **INIMIGOS APLICAM EFEITOS**: balas de fogo queimam, verdes envenenam (e as
+  gélidas congelam como sempre); contato de faíscas/morcegos queima, corrupções e
+  almas envenenam. Nenhum efeito mata sozinho — para em 1 de vida. Vinheta de
+  status na tela; ROSÁRIO PARTIDO e ÂNCORA DA ALMA interagem.
+- **IA MAIS ESPERTA**: cuspedores/feiticeiros/vigias miram ONDE VOCÊ VAI ESTAR (com
+  erro humano); perseguidores (corrupção/espectro-veloz) tentam fechar os lados;
+  sh/cr/crs mais lentos; Coisa de Cervo a 255 de perseguição (Thor corre 285) —
+  o terror é a caça, não a velocidade bruta.
+- **ZERO DRENAGEM PASSIVA**: auditoria completa — Pacto da Fome, Fome Insciável,
+  Coração Falso, Açougueiro, Falso Rei, Barqueiro, Dívida Infinita e Dívida de
+  Sangue reescritos: cobram almas, cadência ou dano recebido, nunca mais vida.
+- **SINERGIAS REAIS**: registro central de 15 combinações entre os itens novos
+  (ativam e desativam sozinhas; descobertas ficam no grimório, aba SINERGIAS).
+- **MAGIKA**: cada descida sorteia um valor (0-999) e 1-2 eventos (luz estranha,
+  mensagem velha no grimório, aparição, paleta pálida, silêncio denso).
+- **O LIVRO**: menu renovado como grimório antigo de duas páginas com dobra
+  central; abertura animada (capa 3D → tinta que revela) pulável com um clique.
+- **MOD STUDIO EXTERNO**: mod-studio.html abre FORA do jogo (mesma pasta) —
+  gerenciador, 17 famílias de balas, forja de padrões (5 formações + desenho +
+  intervalo + 8 formatos + bala personalizada), MÁQUINA DE BLOCOS com linha do
+  tempo e simulação, USAR NOS INIMIGOS e buff/nerf. EXPORTA o JSON que o EDITOR
+  DE MODS do jogo IMPORTA. O estúdio interno do jogo continua intacto.
 
-## v48 (v1.6.1) — O JULGAMENTO VERDADEIRO (histórico)
+## NOVO (v56 / v1.8.0) — A MÁQUINA DAS ALMAS
 
-- **A PORTA DE TRÁS SAIU DE VEZ**: nada de portão desenhado atrás do Thor na
-  arena do Cérbero — ele entra e a arena é só arena. O portão DE VERDADE (o do
-  caminho, aberto com [Z]) segue intacto.
-- **KAIZO DE VERDADE — A 9ª SPELL CARD**: no KAIZO a sentença tem NOVE barras e
-  a nona é **Cão Branco 「Julgamento Verdadeiro」**: o Cérbero invoca CINCO
-  ESFERAS (azul/cinza/amarela/verde/vermelha) que atiram SIMULTANEAMENTE
-  padrões independentes — leques mirando você; círculos que também miram;
-  lentas que PARAM e mudam de direção; balas aleatórias que depois DESCEM na
-  diagonal; e círculos que se CRUZAM. Todos ativos ao mesmo tempo.
-- **A CARD 6 REFEITA**: a Chuva do Último Círculo alterna QUATRO FORMAÇÕES —
-  balas roxas grandes coladas deixando rastros VERMELHOS que se desviam em
-  direções variadas; círculo girando p/ ESQUERDA; círculo girando p/ DIREITA
-  (rastros como no primeiro); e a formação circular anterior se REPETE.
-- **O LIMBO FICA CINZA**: depois de duas fases a grama e o cenário perdem a cor
-  e o nome da fase é só **o limbo...?** — inimigos incomumente poucos e fracos
-  (ameaça pela metade, ~42% da fila), como se alguém já tivesse passado.
-- **A AURA DOURADA + A PLACA**: perto do fim, uma aura dourada estranha vaza da
-  porta do chefe. Chegando lá, NÃO tem chefe: tem uma PLACA — "aqui teria o
-  primeiro pecado: ganancia, por preguiça e ainda uma junção de ideias, apenas
-  tera isso, mas imagine uma luta fofda e ele no final rouba tudo seu".
-- **LUXURIA E O FIM DOS CÍRCULOS**: lida a placa ([Z] lê, [Z] sai), abre-se um
-  buraco com aura rosa escrito "luxuria" — entrando nele: "fim dos circulos por
-  um momento" com CONTINUAR (MODO INFINITO — a descida não termina) ou VOLTAR
-  AO MENU. (O Juiz Sem Rosto segue intacto no código — o lab pode invocá-lo.)
-- **VIDA MAIOR, SEM REPETIÇÃO**: o remake nasce com 2500 + ameaça×130 (era
-  2200 + ameaça×120) e NENHUMA spell card se repete — apareceu uma vez na
-  barra, dá lugar ao FÔLEGO (leques âmbar modestos, sem ritual, sem placa) até
-  a barra quebrar e a próxima card subir.
-- **O PONTO VERMELHO DA HITBOX**: segurando SHIFT, o ponto central ficou BEM
-  VISÍVEL (raio 4.2, vermelho puro com contorno branco) — e aparece sempre que
-  o shift está pressionado.
-- **REMAKE NO MEIO, UM POUCO PRA CIMA**: nasce em W/2 × H×0.34 e os saltos
-  preferem a metade de cima — sobra arena embaixo pra desviar e atacar.
-- **O MOUSE ATIRA COMO AS TECLAS**: segurar o botão = segurar a seta (mesma
-  cadência, mesmo comportamento; a mira segue o cursor).
-- **MÚSICA POR ÁREA**: ao iniciar a descida a música do MENU cala e o MAPA
-  ganha tema próprio; portão, vulcão, corredor azul, limbo e o limbo...? têm
-  faixas próprias (sintetizadas — ou coloque portao.ogg / vulcan.ogg /
-  azul.ogg / limbo.ogg / limbo-cinza.ogg na pasta de músicas e elas tocam).
+- **MÁQUINA DE BLOCOS (nova aba — o Visual Logic Editor)**: monte o ataque com
+  blocos conectados, SEM programar. **DISPARAR PADRÃO** (mira no jogador ou
+  ângulo fixo; ×vezes com intervalo), **ESPERAR**, **GIRAR FORMAÇÃO** (graus +
+  giro contínuo por Xs), **VELOCIDADE DAS BALAS** (×), **COR DAS BALAS**,
+  **DIVIDIR BALAS** (cada bala vira N em leque, após Xs), **ESPERAR VIDA DO
+  CHEFE** (o ataque pausa até o chefe chegar a X% — adianta com SIMULAR DANO
+  −10% na área de testes), **REPETIR SEQUÊNCIA** (com CORPO aninhado),
+  **ALEATÓRIO ENTRE DOIS RAMOS**, **SIMULTÂNEO** (os dois ramos ao mesmo
+  tempo), **USAR OUTRA MÁQUINA** (sua sequência salva vira bloco reutilizável
+  em outros projetos) e **ENCERRAR ATAQUE**. Cada bloco tem seus campos
+  próprios — mexeu, salvou, a linha do tempo redesenha.
+- **LINHA DO TEMPO**: o ataque compilado no tempo — cada bloco é um trecho na
+  cor do tipo, com o total estimado (e a marca ? nos portões de vida / USAR,
+  que dependem da luta). Enquanto a máquina roda, o PONTEIRO corre numa faixa
+  no pé da arena mostrando onde o ataque está.
+- **NO JOGO REAL**: **TORNAR A SPELL DO SENHOR** — a máquina vira a spell card
+  do Bruxo/Carrasco/Viúva/Golem e roda pelo MESMO trilho das spell cards
+  (zero mudança no motor; arquivos originais intactos). REMOVER SPELL DA
+  MÁQUINA desfaz. Status mostra todas as máquinas presas.
+- **SIMULADOR COM JOGADOR DE TESTE**: o Thor da área de testes ganhou PILOTO
+  AUTOMÁTICO — **PARADO**, **LATERAL** (vai-e-volta), **CIRCULAR**, **ROTA**
+  (clique pontos na arena — até 10 — e ele faz o circuito) e **REPRODUZIR**
+  (grava o SEU movimento a 30 Hz e repete em laço — compare versões A/B do
+  mesmo ataque com o mesmo piloto). **SIMULAR DANO −10%** adianta os portões
+  de vida. Gravação: ● GRAVAR MOVIMENTO / ■ PARAR / LIMPAR.
+- **O mod CRIAÇÃO já vem com A MÁQUINA DE EXEMPLO**: espiral → esperar →
+  acelerar → girar → dividir → anel → encerrar (a sequência do conceito).
 
-## NOVO (v47 / v1.6.0) — O ANEL QUE ACELERA
+## NOVO (v55 / v1.7.3) — A FORJA DAS BALAS
 
-- **O PORTÃO NÃO FECHA MAIS** quando o Thor entra na arena do Cérbero: o vão
-  fica aberto atrás dele — sem estrondo, sem tremer, sem o "não há mais volta".
-- **O FRENESI DO GUARDIÃO SAIU**: na última cabeça o Cérbero antigo não investe
-  mais — ele cospe **UM CÍRCULO DE TIROS (16 balas) cuja cadência sobe A CADA
-  SEGUNDO** (intervalo 1,6s → −0,18s/s até o piso .45s), sem exaustão, sem pausa.
-- **O REMAKE ATIRA SEM PARAR**: cooldown de TODOS os tiros menor (tabela
-  NORMAL int .9→.72 / spd 1.08→1.14 — e as demais na mesma proporção), mais
-  balas nos anéis (+12% rosário/cruz/eclipse), ritual da card .55→.35s e o
-  respiro entre cards com **TETO DURO de 1s** (era até ~1,4s+; nunca passa disso).
-- **AS SPELL CARDS 6 E 8 FICARAM MAIS DIFÍCEIS**: CHUVA DO ÚLTIMO CÍRCULO e
-  VERMELHO ABSOLUTO com fator próprio 1.18 (salvas 18% mais juntas, tiros 18%
-  mais rápidos), vermelho com +22% de balas e a chuva com 1 corredor só já no
-  DIFÍCIL.
-- **O CORREDOR VOLTOU NA ENTRADA DO LIMBO**: o barco atraca, o Thor desce num
-  corredor escuro (O CORREDOR — algo aguarda adiante...) e **atravessa como quem
-  passa por uma porta — sem portal nenhum**; no fim, o LIMBO se revela.
-- **A BARRA DE VIDA DO CÉRBERO NUNCA MAIS APARECE NO LIMBO**: o remake devolvia
-  boss.active=true com barT=1 para a cena final e nada desligava no caminho da
-  Segunda Descida — agora a barra morre ao sair da arena (startBlueCorr) e há
-  dupla blindagem no enterLimboOfficial + no próprio draw.
+- **FORJA DO PADRÃO (área de testes)**: o modo CRIAR/EDITAR MEU PADRÃO virou
+  criação completa — **tipo de formação** (desenho, espiral, anel, estrela,
+  onda) com **MINI-TELA DE DESENHO** dentro da própria área de testes;
+  **INTERVALO entre vagas** editável (a cadência das vagas é sua; o intervalo
+  também vale nos padrões atribuídos aos senhores); **FORMATO DA BALA (8)**
+  com GALERIA ao vivo (círculo, diamante, estrela, anel, seta, quadrado,
+  cruz, oval — desenhados com a cor/tamanho do padrão); **BALA
+  PERSONALIZADA** — o padrão nasce com o estilo COMPLETO de uma bala da aba
+  BALAS (forma, tamanho, cor, transparência, brilho, rastro, rotação);
+  **DUPLICAR ESTE** para mexer nos que já têm sem perder o original.
+- **USAR NOS INIMIGOS**: painel na forja — escolha o SENHOR + o padrão
+  nativo dele e **SUBSTITUA** pelo padrão da forja (`data.bossPats`, vale no
+  jogo com o mod ATIVADO), ou **TORNE-O A SPELL CARD** do senhor (todos os
+  ataques viram ele). Painel de status mostra tudo que o mod já substituiu /
+  vinculou. REMOVER para os dois.
+- **OS 8 FORMATOS EM TODO LUGAR**: o sim da área de testes, o preview da aba
+  PADRÕES e o JOGO REAL (gancho aditivo no drawEBullets — `b.sh` só existe
+  em balas nascidas da forja) desenham o formato escolhido; o estilo da bala
+  personalizada é aplicado até com o mod apenas ABERTO (não ativo) dentro da
+  área de testes, para prever com fidelidade.
+- **O EDITOR DE PADRÕES (aba) também ganhou**: intervalo entre vagas,
+  FORMATO DA BALA (8) e BALA PERSONALIZADA — salvos no mesmo padrão.
+
+## NOVO (v54 / v1.7.2) — A OFICINA VIVA
+
+- **A ÁREA DE TESTES É A SALA DO JOGO**: a arena clássica 660×400 se aposentou.
+  Os TRÊS modos agora rodam no mesmo simulador fiel (a sala REAL, as mesmas
+  paredes e o mesmo Thor de teste — 240 px/s, 120 no foco). Testar longe do
+  jogo enganava; agora o que você vê no teste é o que você enfrenta na luta.
+- **CRIAR / EDITAR MEU PADRÃO (ao vivo)**: novo modo da área de testes — o
+  boneco dispara um padrão SEU sem parar, na escala do jogo, enquanto você
+  mexe em **balas por vaga, velocidade, tamanho, rotação/vaga e cor** DURANTE
+  o teste: a próxima vaga já nasce com os novos valores e já fica SALVO no
+  mod. **+ NOVO PADRÃO** cria um ali mesmo; **ABRIR NO EDITOR DE PADRÕES**
+  pula para o desenho à mão com o padrão selecionado.
+- **BUFF / NERF nos padrões do jogo**: no modo chefe real, dois sliders —
+  **VELOCIDADE DAS BALAS (×0.4–2.5)** e **CADÊNCIA DE RE-ATAQUE (×0.4–2)** —
+  mudam SÓ o padrão escolhido daquele senhor. O efeito aparece na hora no
+  simulador e fica salvo no mod (`data.tuning` 'tipo|padrão' → {sp,cd});
+  **vale na luta real quando o mod está ATIVADO** (botão **ATIVAR ESTE MOD**
+  ali mesmo; **REMOVER AJUSTE** desfaz; o HUD mostra "BUFF/NERF: VEL ×… ·
+  CAD ×…"). As balas nascem marcadas com o padrão de origem (tagBullets nos
+  8 atos dos senhores) e recebem o ajuste 1× cada (updateEBullets); a
+  cadência entra nos 4 fins de padrão (endTune) sem tocar o encadeamento.
+- **COMO FICA NO JOGO (sprites)**: o editor de sprites ganhou a pré-visuali-
+  zação que faltava — o sprite desenhado na **caixa REAL que o motor usa**
+  para cada slot (Thor 52×58, inimigos r×3, senhores r×3-3.4, Caronte r×4,
+  a Besta em tela, o piso esticado na sala), numa mini-cena de sala. Modos
+  **SOBREPOSTO NO JOGO** (original a X% por baixo do seu) e **LADO A LADO NO
+  JOGO** (original no jogo | o seu no jogo), e o botão **SALVAR E VER NO
+  JOGO**: salva, ATIVA o mod e fecha o editor para você ver o sprite na luta.
+- **AVANÇO TRIPLO CORRIGIDO (o Carrasco)**: ele avança **EM DIREÇÃO AO
+  JOGADOR nas TRÊS investidas** — cada uma mira onde o Thor está no momento
+  (a rota carmesim aparece no chão) e cada batida na parede espalha estilha-
+  ços. Na **terceira**, QUANDO CHEGA PERTO (~150px), desfere **O GOLPE DA PÁ
+  ali mesmo** (anel de aviso 132px, 0.5s para sair, estouro com brechas). Se
+  o Thor despistar, ele completa a investida e o golpe sai na parede do
+  mesmo jeito. Fase II: avanços a 800 px/s e anel extra.
+
+# THOR REVENGE — v1.7.1 "O ENSAIO DOS SENHORES" (v53: o estúdio MOSTRA tudo —
+# pré-visualizações consertadas (balas voando + galeria dos 8 formatos ao vivo,
+# padrões disparando do centro), nova aba PADRÕES DOS BOSSES com os padrões
+# REAIS dos 4 senhores (como funcionam, simulação com a IA verdadeira e
+# substituição pelo padrão do seu mod), SPELL CARDS DO JOGO documentadas com
+# VER AO VIVO, spell FAZ para o boss OU SUBSTITUI UM padrão dele, e a ÁREA DE
+# TESTES com CHEFE REAL — a mesma IA do jogo, Fase II ligável)
+
+## NOVO (v53 / v1.7.1) — O ENSAIO DOS SENHORES
+
+- **PRÉ-VISUALIZAÇÕES CONSERTADAS**: as previews de BALAS e PADRÕES morriam no
+  boot (o laço saía com o editor fechado e ninguém as reativava) — agora cada
+  aba reativa a sua preview ao entrar. A bala voa pelo caminho usando o estilo
+  ATUAL dos campos (não precisa salvar) e a **GALERIA DOS 8 FORMATOS** (círculo,
+  diamante, estrela, anel, seta, quadrado, cruz, oval) redesenha a cada ajuste
+  de cor/tamanho/brilho/transparência.
+- **NOVA ABA — PADRÕES DOS BOSSES**: o catálogo REAL dos padrões dos 4 senhores
+  de mapa (Bruxo 20, Carrasco 12, Viúva 9, Golem 9 — clássicos, exclusivos
+  kaizo e as SPELL CARDS assinatura ★). Cada padrão mostra a descrição de COMO
+  ELE FUNCIONA, o botão **SIMULAR NA ÁREA DE TESTES** (roda a IA verdadeira do
+  jogo, com Fase II) e a **SUBSTITUIÇÃO**: escolha um padrão SEU para entrar no
+  lugar do padrão nativo quando o chefe sortear ele (com o mod ATIVADO).
+- **SPELL CARDS DO JOGO**: a aba de spell cards lista os feitiços reais dos
+  senhores (GRIMÓRIO RASGADO, INVESTIDA RICOCHETE, AVANÇO TRIPLO, ENXAME
+  VAMPIRO, FIOS DA MORTE, MARÉ DE MAGMA) com descrição e **VER AO VIVO**.
+- **SPELL — FAZER OU SUBSTITUIR**: o vínculo da spell card virou um MODO:
+  `só na ÁREA DE TESTES` · `FAZER PARA O BOSS` (substitui TODOS os ataques) ·
+  `SUBSTITUIR UM padrão do boss` (escolhe chefe + padrão alvo — o resto do
+  moveset continua o original).
+- **ÁREA DE TESTES COM CHEFE REAL**: além de testar a sua spell contra o Thor,
+  o modo **SIMULAR PADRÃO REAL DE CHEFE** roda o padrão escolhido com a MESMA
+  IA do jogo (telegráfos, minas, fios da morte, maré de magma, cura do
+  morcego, investidas, Fase II) contra um Thor de teste (WASD/setas, SHIFT
+  foco). A simulação troca os cenários do motor num try/finally e devolve
+  tudo — a run real não é tocada. HUD mostra HP do chefe (a cura do morcego
+  aparece!), hits e balas.
+- Atalho no console: `__MODS.simBoss("gz","kz_magma")` pula direto para a
+  simulação.
+
+# THOR REVENGE — v1.7.0 "O ESTÚDIO DAS ALMAS" (v52: o EDITOR DE MODS integrado
+# ao jogo — gerenciador de mods (ativar/desativar/exportar/importar), editor de
+# balas (forma/tamanho/cor/alpha/brilho/rastro/rotação/velocidade), editor de
+# padrões desenhados com o mouse, editor de spell cards vinculáveis aos
+# senhores de mapa, editor de sprites com referência transparente do original,
+# área de testes com Thor controlável; os arquivos originais nunca sobrescritos)
+
+## NOVO (v52 / v1.7.0) — O ESTÚDIO DAS ALMAS
+
+- **EDITOR DE MODS no menu principal** (botão lilás EDITOR DE MODS): a
+  plataforma de criação inteira dentro do jogo — nada de download, nada de
+  código. Os arquivos originais NUNCA são sobrescritos: cada mod vive no
+  navegador (localStorage) e viaja como JSON.
+- **GERENCIADOR**: crie/renomeie/descreva/versone mods, ATIVE ou DESATIVE a
+  qualquer momento, EXPORTAR (baixa .json ou copia para a caixa) e IMPORTAR
+  (cole o JSON ou escolha o arquivo — validação com mensagem de erro clara).
+  O mod **CRIAÇÃO** já vem instalado com exemplos (2 padrões + 1 spell card).
+- **EDITOR DE BALAS**: 16 famílias de bala do jogo identificadas pela cor;
+  para cada uma: forma (círculo, diamante, estrela, anel, seta, quadrado,
+  cruz, oval), tamanho (×0.2–×4), cor, transparência, brilho, rastro,
+  rotação (graus/s) e velocidade (×0.3–×2.5) — com pré-visualização ao vivo.
+  Com o mod ATIVADO as balas reais mudam na hora (velocidade aplicada 1× na
+  bala nova; visual desenhado pelo mod).
+- **EDITOR DE PADRÕES**: DESENHE a formação com o mouse/toque no canvas — o
+  traço vira a formação de balas — ou use os tipos prontos (espiral, anel,
+  estrela, onda). Ajuste quantidade (3–64), velocidade, rotação por vaga
+  (acumula — espiral gira), tamanho e cor. Pré-visualização disparando do
+  centro.
+- **EDITOR DE SPELL CARDS**: nome, personagem que usa, dificuldade livre e a
+  sequência de fases: cada fase = padrão + atraso + intervalo + vezes +
+  segura (reordenáveis, removíveis). **VÍNCULO COM O CHEFE**: Bruxo,
+  Carrasco, Viúva ou Golem — com o mod ativo, o senhor de mapa lança a SUA
+  spell card (placa SPELL CARD na tela) em vez dos padrões normais.
+- **EDITOR DE SPRITES**: 34 slots (Thor, os quatro senhores, Cérbero, cabeça,
+  Caronte, a Besta, piso, inimigos, cavaleiros…). Ferramentas: lápis,
+  borracha, balde, conta-gotas, desfazer (20 passos), limpar. **O ORIGINAL
+  COMO REFERÊNCIA**: o arquivo real de assets/sprites/ aparece
+  semitransparente por baixo (opacidade 0–100%), com modo LADO A LADO,
+  nome do arquivo e dimensões de ambos à vista; sem bitmap (arte vetorial),
+  a tela começa vazia para você desenhar do zero. Salvar entra no mod;
+  RESTAURAR ORIGINAL remove o override.
+- **ÁREA DE TESTES**: arena própria com Thor controlável (WASD/setas, SHIFT
+  mostra a hitbox de foco de 4px) contra a spell card selecionada — pausar
+  (P), passo a passo (.), reiniciar (R), HUD com tempo/balas/hits/HP.
+- **SEGURANÇA**: mods só existem no navegador; exportar antes de limpar os
+  dados; importar valida o formato; desativar o mod devolve TUDO ao original
+  instantaneamente.
+- **E o Editor de Mapas completo fica para a próxima versão** — o estúdio de
+  balas/padrões/spells/sprites já está inteiro.
+
+# THOR REVENGE — v1.6.4 "A CORTE DUPLA" (v51: o Carrasco ganhou DOIS movesets
+ "A CORTE DUPLA" (v51: o Carrasco ganhou DOIS movesets
+# — o AVANÇO TRIPLO (3 investidas marcadas; na 3ª, o ATAQUE DA PÁ de perto) e
+# o ENXAME VAMPIRO (morcegos que curam o chefe ao te acertar); A ENXURRADA:
+# balas kaizo 30% mais rápidas e padrões MUITO mais densos; senhores re-atacam
+# ~23% mais rápido no kaizo; e 5% das salas de chefe acordam DOIS senhores)
+
+## NOVO (v51 / v1.6.4) — A CORTE DUPLA
+
+- **O CARRASCO — AVANÇO TRIPLO (spell card)**: ele avança TRÊS vezes. Cada vez
+  que BATE NA PAREDE, a direção do PRÓXIMO avanço aparece NO CHÃO (linha
+  carmesim tracejada). Na TERCEIRA investida ele usa **O ATAQUE DA PÁ**:
+  anel de aviso ao redor dele, depois o golpe de perto — estilhaços em anel
+  com brecha + a lâmina varrendo na direção que ele olha. Fase II: avanços
+  de 800 px/s e anel maior.
+- **O CARRASCO — ENXAME VAMPIRO (spell card)**: morcegos de asas roxas que
+  perseguem o Thor. **CADA morcego que ACERTA CURA o Carrasco** (+18, Fase II
+  +26 — o número verde aparece em cima dele). Os morcegos são DERRUBÁVEIS a
+  tiro. Fase II: duas vagas de morcegos.
+- **A ENXURRADA (velocidade)**: em sala kaizo, TODAS as balas inimigas voam
+  **30% mais rápido** (acumula com hard/NEO).
+- **A ENXURRADA (densidade)**: MUITO mais balas em todos os padrões — sigilos
+  9/6 com 8 estilhaços cada, leques 7/5, cometas 6/4 vagas ×4, fileiras do
+  Grimório 15 (brecha garantida), guilhotinas 4/3 colunas × 9 lâminas,
+  corrente 2× mais densa, execução com 8 tiros por braço, investida com
+  18/13 estilhaços, ninhada 4/3 crias, laço 32/26, fissuras 4/3 × 13
+  cusparadas, tempestade 14/10 nuvens, núcleo 24 por volta × 4/3, maré de
+  magma com 14 vagas e 4 cristas — e os clássicos do Bruxo kaizo também
+  (espiral 5 braços, shotgun 10×6, coroas 5×22, pétalas 17, enxame 16…).
+- **CADÊNCIA**: no modo kaizo os quatro senhores re-atacam **~23% mais
+  rápido** (Bruxo 0,42s, Carrasco 0,85s, Viúva 0,7s, Golem 1,0s entre
+  padrões).
+- **A CORTE DUPLA (5%)**: em cada sala de chefe do mapa, 5% de chance de
+  acordar **DOIS senhores ao mesmo tempo** (o gêmeo nasce com 80% da vida).
+  O aviso A CORTE DUPLA entra na tela e o subtítulo do banner troca.
+- **Nada mudou nas regras de justiça**: brechas continuam garantidas em toda
+  onda; nenhum padrão fecha todas as rotas de fuga; telegráficos intactos.
+
+# THOR REVENGE — v1.6.3 "OS QUATRO FEITIÇOS" (v50: cada senhor de mapa ganhou
+# THOR REVENGE — v1.6.3 "OS QUATRO FEITIÇOS" (v50: cada senhor de mapa ganhou
+# o SEU spell card assinatura com Fase II própria — Grimório Rasgado, Investida
+# Ricochete, Fios da Morte, Maré de Magma; conserto: Carrasco/Viúva/Golem agora
+# lançam os feitiços exclusivos kaizo que já tinham; loja em destaque total;
+# drops saem das paredes sozinhos; o portal espera a bênção do chefe)
+
+## NOVO (v50 / v1.6.3) — OS QUATRO FEITIÇOS
+
+- **SPELL CARD ASSINATURA PARA CADA SENHOR DE MAPA** (entra com a placa SPELL
+  CARD na tela e domina o sorteio na Fase II):
+  * **O BRUXO — GRIMÓRIO RASGADO**: linhas mágicas atravessam a arena, piscam
+    em roxo e cospem fileiras de projéteis (brecha de duas vagas garantida).
+    Fase II: LEITURA DUPLA — horizontais primeiro, diagonais depois, com
+    aviso visual próprio (magenta).
+  * **O CARRASCO — INVESTIDA RICOCHETE**: atravessa a arena, bate na parede
+    (zona de impacto + estilhaços) e volta por outro ângulo; a direção aparece
+    NO CHÃO antes de cada avanço. Fase II: TRÊS investidas em cadeia.
+  * **A VIÚVA — FIOS DA MORTE**: fios finos entre âncoras tensionam e passam a
+    CORTAR quem cruza. Fase II: sequência em triângulo e diagonais, os ativos
+    continuam visíveis — e um lado da arena fica sempre aberto.
+  * **O GOLEM — MARÉ DE MAGMA**: sinais verdes mostram direção e zonas seguras
+    antes de a onda cruzar a arena em três cristas. Fase II: SEGUNDA onda de
+    outra direção depois que a primeira passa, com zonas seguras remarcadas.
+- **CONCERTO HISTÓRICO**: o Carrasco, a Viúva e o Golem tinham feitiços
+  exclusivos kaizo prontos desde a v0.9.16 mas NUNCA os lançavam (só o Bruxo
+  sorteava os dele) — agora os quatro minibosses sorteiam os exclusivos.
+- **LOJA DO ERRANTE**: bênção selecionada em DESTAQUE TOTAL — placa clara com
+  moldura azul e NOME em AZUL-ESCURO, bem legível (feira do chão e cartas).
+- **DROPS NUNCA MAIS FICAM NAS PAREDES**: bênção, pacto, coração, almas,
+  fagulha — dentro da parede deslizam de volta ao chão; fora do mapa, retornam
+  ao MEIO da sala (checado a cada quadro).
+- **O PORTAL ESPERA A BÊNÇÃO**: derrotou o chefe e a bênção está no chão? O
+  portal só nasce quando você a pega.
+- **COLHER COMICAMENTE GRANDE**: descrição mínima — "é uma colher.
+  comicamente grande."
+
+# THOR REVENGE — v1.6.2 "O CARROSSEL DAS ARMAS" (v49: a escolha de armas
+# virou carrossel — uma arma por vez, ◀ ▶ na tela ou setas do teclado, ENTER
+# confirma e pontos pulam direto; o LIMBO parou de travar — paredes espelhadas
+# pré-calculadas e em cache; e a fase cinza do Limbo ficou LISA, fundo cinza
+# sem estrutura nenhuma)
+
+## NOVO (v49 / v1.6.2) — O CARROSSEL DAS ARMAS
+
+- **A ESCOLHA DE ARMAS VIROU CARROSSEL — UMA ARMA POR VEZ**: em vez da parede
+  de 8 cartas, agora você vê UMA arma de cada vez. Os botões **◀ ▶ nas
+  laterais** trocam o lado (a carta desliza devagarinho); as **SETAS ← → do
+  teclado** fazem o mesmo; **ENTER ou ESPAÇO confirma a arma da frente**; e os
+  **pontos embaixo** pulam direto para qualquer arma (cada ponto mostra o nome
+  no mouse-over). O **NORMAL/HARD** e o **VOLTAR** ficaram onde sempre
+  estiveram. Funciona em TODOS os caminhos que abrem a escolha: a descida de
+  verdade, o PORTÃO DO CÉRBERUS · TESTE e o LIMBO · FASE FINAL · TESTE. Os
+  cliques nas cartas continuam valendo — os binds antigos ficaram intactos.
+- **O LIMBO PAROU DE TRAVAR**: a causa era a **parede espelhada** do Falso
+  Paraíso — a cada quadro, o jogo varria as bordas da sala (passo a passo de
+  7px) e, para CADA trecho externo, criava DOIS gradientes com recorte
+  (clip). Dezenas de gradientes + clips POR FRAME = a travada. Agora os
+  trechos externos são **pré-calculados na construção da sala** (com corridas
+  mescladas — 1 segmento por trecho, não 1 por passo) e a parte estática
+  (brilho leitoso, reflexo difuso, rachaduras) fica pintada **numa camada em
+  cache**: o quadro inteiro virou **1 cópia de imagem + traços de brilho
+  baratos**. As rachaduras das paredes agora nascem FIXAS por sala (antes
+  piscavam aleatórias a cada quadro — efeito colateral positivo). As fases
+  1–3 do Limbo seguem com o mesmo visual de sempre.
+- **A FASE CINZA DO LIMBO FICOU LISA — SEM ESTRUTURA NENHUMA**: no último véu
+  (O LIMBO INFERNAL — FASE 2, andar 9 — o mesmo do botão de teste), o paraíso
+  acaba de vez: o chão é **CINZA LISO** — sem grama, sem manchas, sem pedras,
+  sem flores, sem rachaduras, **sem paredes espelhadas**, sem pólen dourado —
+  e lá fora é o MESMO cinza, um tom abaixo: **sem céu, sem catedrais, sem
+  árvores, sem grama distante, sem brilho animado**. A única marca no piso é
+  a borda de sempre, num traço cinza-escuro. O véu de fogo e as fissuras com
+  brasa MORRERAM nessa fase (a fase anterior, LIMBO INFERNAL — FASE 1, segue
+  queimando como sempre). De quebra, essa fase agora é a mais LEVE do jogo.
+
+
+- **A BESTA DA MORTE ACEITA A SUA ARTE**: a criatura que aparece quando você
+  perde (chifres curvos, cabeça negra, olhos em brasa, sorriso serrilhado)
+  agora pode ser SUBSTITUÍDA pela sua arte. Coloque um PNG (ou JPG/WEBP/GIF)
+  em `assets/sprites/` com o nome **besta.png** — também valem
+  **besta-das-trevas.png**, **besta-do-abismo.png**, **a-besta.png**,
+  **fera.png**, **fera-das-trevas.png** e **beast.png** (maiúsculas, acentos
+  e espaços tanto faz). A arte entra SOZINHA, mesmo com o jogo rodando (a
+  pasta é re-escaneada a cada ~15s e a cada foco da janela; `__SPRITES_RESCAN()`
+  força). O que sai: a besta vetorial inteira. O que fica: o texto de
+  provocação aleatório e a assinatura *— A BESTA DO ABISMO —*. Tamanho livre
+  (a caixa é ~340×400, centrada um pouco acima do centro — espaço para
+  chifres). Sem o arquivo, a besta vetorial de sempre aparece — nada quebra.
+  No STANDALONE: crie a pasta `assets/sprites/` ao lado do .html e coloque o
+  besta.png lá dentro (funciona por duplo clique).
+- **O JOGO INTEIRO SE ENCAIXA NA SUA RESOLUÇÃO — SEM BARRA DE ROLAGEM**: o
+  canvas já preenchia a janela (letterbox); agora o re-encaixe também dispara
+  na ROTAÇÃO do celular, ao ENTRAR/SAIR da tela cheia (F11), no
+  visualViewport (zoom/barras do sistema) e com um segundo passe atrasado
+  (navegadores que assentam o layout tarde). E os PAINÉIS DOM (menu, seletor
+  de armas, opções, versão…) que não couberem na janela ROLAM POR DENTRO —
+  nenhum botão fica mais cortado em telas/janelas pequenas; em monitores que
+  cabem tudo, NADA muda visualmente (o centrador é idêntico ao de sempre).
+  A página em si nunca tem barra de rolagem (overflow travado + overscroll
+  desligado).
+
+## NOVO (v47 / v1.6.0) — O CONSERTO DAS SALAS
+
+- **SALAS SECRETAS — A CHANCE MÍNIMA**: TODA entrada numa sala secreta (inclusive
+  revisitas) tem **10% de revelar uma BÊNÇÃO ALEATÓRIA** extra; se a visita já
+  deixou uma bênção no chão, ela não duplica. O presente da primeira visita
+  (bênção 50% / +4 de vida 50% / rei 14%) segue intacto.
+- **O VELHO REI FECHA A SALA**: entrou numa sala secreta e o rei está lá? As
+  portas (e a rachadura da sala isolada) TRANCAM atrás de você — não existe
+  volta até o rei cair. A despedida dele reabre tudo (updateReiDeath → openDoors),
+  como sempre fez.
+- **PORTAS CEDEM À EXPLOSÃO**: a bomba (PORTA DAS SOMBRAS), o tiro explosivo
+  (Pólvora) e a FAGULHA [Q] destroem portas trancadas **por inimigos**
+  (combate/desafio não varrido) ou **por enigma** (puzzle não resolvido).
+  A porta destruída nasce aberta se você voltar (r.doorBlown persiste por sala).
+  **CHEFE, MINI-CHEFE e chefe secreto continuam sagrados** — essas trancas
+  nenhuma bomba quebra (salas do chefe nem têm portas).
+- **NADA MAIS DESAPARECE**: a regra dos 11 segundos morreu — almas e vida no chão
+  não expiram mais (bênçãos/ativos/fagulha já eram imortais). E ao SAIR da sala
+  os itens não são apagados: ficam guardados na sala (savedPk) e voltam exatamente
+  onde estavam ao reentrar, com o deslocamento da nova origem compensado. Baús
+  seguem com o sistema antigo de re-push; a varredura da sala (collectRoomPickups)
+  também não apaga mais bênçãos/ativos/fagulhas.
+- **HITBOX MENOR**: player.hitR 5px → **4px** (36% menos área de dano). O r:11
+  continua para movimento/portas/itens. O **ponto carmesim SÓ aparece com SHIFT
+  segurado** (FOCO) — soltou, some (comportamento da v1.4.6, agora explícito).
+- **DESCRIÇÕES CURTAS**: O CREDOR e a COLHER COMICAMENTE GRANDE (expansion.js
+  X_WEAPONS.hint) encurtadas para o essencial.
+- **BOTÃO LIMBO · FASE FINAL · TESTE** no menu (temporário, igual ao do portão):
+  escolha a arma e caia direto na fase 4 do Limbo (O LIMBO INFERNAL — FASE 2,
+  andar 9) — varreu o mapa, o Juiz desperta. startLimboTestDirect +
+  game.limboTestPending (preservado no resetAll, limpo no wBack).
 
 ## NOVO (v46 / v1.5.9) — O ATALHO DE VOLTA
 

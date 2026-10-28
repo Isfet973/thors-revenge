@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Pirata+One&family=IBM+Plex+Mono:wght@400;600&family=IM+Fell+English+SC&family=Metamorphous&family=Caesar+Dressing&family=Special+Elite&family=Rock+Salt&family=Monoton&family=Fiber&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=165">
+<link rel="stylesheet" href="style.css?v=192">
 </head>
 <body>
 <canvas id="cv"></canvas>
@@ -31,42 +31,57 @@
   <svg id="icOff" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4z" opacity=".3"/><path d="M19 4l-1.4 1.4 4 4-4 4 1.4 1.4 4-4 4 4 1.4-1.4-4-4 4-4-1.4-1.4-4 4-4-4z"/></svg>
 </button>
 
-<!-- ===================== MENU PRINCIPAL — A PORTA ===================== -->
-<div id="menu" class="overlay">
-  <div id="gateScene" aria-hidden="true">
-    <div class="gate-glow"></div>
-    <div class="fog f1"></div>
-    <div class="fog f2"></div>
-    <div class="gate">
-      <div class="gate-arch"></div>
-      <div class="gate-door gl"><span class="inscr">✕ ◈ ✕ · CONDEMNATVM</span><span class="inscr i2">·LASCIAVE·OGNE·</span></div>
-      <div class="gate-door gr"><span class="inscr">✕ ◈ ✕ · INFERNVM</span><span class="inscr i2">·SPERANZA·VOI·</span></div>
-      <div class="gate-slit"></div>
-      <div class="gate-veins"></div>
-    </div>
+<!-- ===================== ENTRADA — O TÍTULO E O INÍCIO (v1.9.2) =====================
+     A porta da frente do jogo: THOR REVENGE em cima, INICIAR logo abaixo.
+     v1.9.2: a ENTRADA pode nascer em MODO CINE (sobre o quadro final da
+     introdução cinematográfica — fundo transparente, título que se revela
+     como inscrição antiga) — o livro.js controla isso com .cineMode.
+     O convite "rever a introdução" fica discreto sob o INICIAR. -->
+<div id="entry" class="overlay solid hidden">
+  <div class="entryRoom" aria-hidden="true"></div>
+  <div class="entryBox">
+    <div class="entrySym" aria-hidden="true">✠</div>
+    <h1 class="entryTitle">THOR<span class="etC">:</span> REVENGE</h1>
+    <div class="entrySub">penumbra das almas</div>
+    <button class="btn entryBtn" id="entryBtn">INICIAR</button>
+    <button class="entryAgain" id="entryAgain" type="button">rever a introdução</button>
+    <div class="entryHint">a descida começa no livro · v1.9.2</div>
   </div>
-  <h1 id="gameTitle">THOR: REVENGE</h1>
-  <div class="rule"><div class="ln"></div><div class="dm"></div><div class="ln"></div></div>
-  <div class="sub">o atalho ao cinza · v1.6.5</div>
-  <div class="sub dante" style="opacity:.82;margin-top:2px">"Abandonai toda esperança, vós que entrais."</div>
-  <div id="menuNews" title="clique para ver as novidades desta versão">v1.6.5 — O ATALHO AO CINZA · botão novo no menu: O LIMBO CINZA · TESTE — escolha a arma e caia DIRETO na ÚLTIMA fase do limbo...? (a fase 4): mapa esvaziado, a aura dourada vazando da porta do chefe, a placa do primeiro pecado e o buraco da luxuria no fim · o caminho normal segue EXATAMENTE igual · todo o resto intacto: hitbox de um tiro, ponto vermelho só no SHIFT, NEO KAIZO, bosses kaizo como o bruxo, mensagem da spell card única por card</div>
-  <button class="btn hidden" id="continueBtn">CONTINUAR</button>
-  <button class="btn" id="startBtn">DESCER</button>
-  <button class="mini hidden" id="menuLimboBtn">IR DIRETO AO ABISMO</button>
-  <!-- v1.5.3: BOTÃO TEMPORÁRIO DE TESTE (v1.5.9: de volta a pedido do usuário — ele vai testar a luta do Cérbero) -->
-  <button class="mini" id="gateTestBtn" style="border-color:#7a3d16;color:#ff8f3d">PORTÃO DO CÉRBERUS · TESTE</button>
-  <!-- v1.6.5: BOTÃO DE TESTE do limbo cinza — cai direto na ÚLTIMA fase do limbo...? (a placa do primeiro pecado) -->
-  <button class="mini" id="limboTestBtn" style="border-color:#3c3c44;color:#b4b4c0">O LIMBO CINZA · TESTE</button>
-  <button class="mini" id="saveBtn">RETORNAR</button>
-  <button class="mini" id="circleBtn">CÍRCULOS</button>
-  <button class="mini" id="conqBtn">ALMAS</button>
-  <button class="mini" id="bestBtn">INVENTÁRIO</button>
-  <button class="mini" id="grimBtn">GRIMÓRIO</button>
-  <button class="mini" id="optBtn">OPÇÕES</button>
-  <button class="mini quit" id="quitBtn">ABANDONAR O INFERNO</button>
-  <div id="metaList" class="stats"></div>
-  <div id="danteLine"></div>
-  <div id="menuClose"><span>O caminho já foi traçado.</span><b>"A descida é sua escolha."</b></div>
+</div>
+
+<!-- ===================== MENU PRINCIPAL — O LIVRO VIVO (v1.9.2) =====================
+     visível desde o boot: a abertura do livro É a cutscene de entrada -->
+<div id="menu" class="overlay">
+  <div id="gateScene" aria-hidden="true" style="display:none"></div>
+  <div id="bookMenu">
+    <div class="pg pgL"><div class="pgIn">
+      <h1 id="gameTitle">THOR: REVENGE</h1>
+      <div class="rule"><div class="ln"></div><div class="dm"></div><div class="ln"></div></div>
+      <div class="sub">o livro vivo · v1.9.2</div>
+      <div class="sub dante" style="opacity:.82;margin-top:2px">"Abandonai toda esperança, vós que entrais."</div>
+      <div id="menuNews" title="clique para ver as novidades desta versão">v1.9.2 — A INTRODUÇÃO CINEMATOGRÁFICA · depois da abertura do livro, a câmera mergulha no manuscrito: a prancha do grande abismo, o Inferno registrado em camadas (muralhas, portas fechadas, silhuetas na fumaça), Thor — o cachorro morto-vivo — acordando com peso no chão de cinza, a anotação antiga "O corpo foi perdido. A vontade permaneceu.", a marca de tinta que aparece na margem sozinha e a travessia em que o desenho vira o mundo · ~45s na primeira vez, PULÁVEL a qualquer momento (a dica fica no canto) · depois só volta a tocar pelo "rever a introdução" na ENTRADA · o INICIAR continua vindo DEPOIS da cutscene, revelado sobre o corredor final · nada mudou nos handlers, saves, lousa ou gameplay</div>
+      <button class="btn hidden" id="continueBtn">CONTINUAR</button>
+      <button class="btn" id="startBtn">DESCER</button>
+      <button class="mini hidden" id="menuLimboBtn">IR DIRETO AO ABISMO</button>
+      <button class="mini" id="gateTestBtn" style="border-color:#7a3d16;color:#ff8f3d">PORTÃO DO CÉRBERUS · TESTE</button>
+      <button class="mini" id="limboTestBtn" style="border-color:#3a5a5a;color:#bfd8e8">LIMBO · FASE FINAL · TESTE</button>
+      <button class="mini" id="modsBtn" style="border-color:#4a3a6a;color:#c9a0ff">MODS · O GERENCIADOR</button>
+      <button class="mini" id="saveBtn">RETORNAR</button>
+    </div></div>
+    <div class="fold" aria-hidden="true"></div>
+    <div class="pg pgR"><div class="pgIn">
+      <div class="pgHead">· REGISTRO DAS DESCIDAS ·</div>
+      <button class="mini" id="circleBtn">CÍRCULOS</button>
+      <button class="mini" id="conqBtn">ALMAS</button>
+      <button class="mini" id="bestBtn">INVENTÁRIO</button>
+      <button class="mini" id="grimBtn">GRIMÓRIO</button>
+      <button class="mini" id="optBtn">OPÇÕES</button>
+      <button class="mini quit" id="quitBtn">ABANDONAR O INFERNO</button>
+      <div id="metaList" class="stats"></div>
+      <div id="danteLine"></div>
+      <div id="menuClose"><span>O caminho já foi traçado.</span><b>"A descida é sua escolha."</b></div>
+    </div></div>
+  </div>
   <div id="circX">CÍRCULO X</div>
 </div>
 
@@ -96,42 +111,155 @@
   <button class="mini" id="descerBack" style="margin-top:14px">VOLTAR</button>
 </div>
 
-<!-- ===================== CÍRCULOS — OS NOVE ===================== -->
+<!-- ===================== CÍRCULOS — A LOUSA (v1.9.1 · CARTOGRAFIA DO INFERNO) =====================
+     O livro FECHA e a lousa aparece: um esquema antigo a giz. A descida em
+     anéis sucessivos (I fora → IX no fundo), cada região com número, nome e
+     símbolo; caminho pontilhado entre os anéis; abismo lacrado no centro.
+     A PENUMBRA DAS ALMAS fica FORA do desenho — à direita, contorno aberto,
+     traço fino e frio, ligada por uma linha lateral descontínua. NUNCA é um
+     décimo anel. IDs preservados (circlePenumbra/circleLimbo/circleEscola/
+     circlesBack): os handlers do game.js seguem mandando em tudo. -->
 <div id="circles" class="overlay hidden solid">
-  <div class="lu-eyebrow">O INFERNO SE DIVIDE — VOCÊ Acredita que conhece o caminho?</div>
-  <h1 style="font-size:clamp(34px,4.5vw,50px)">OS NOVE CÍRCULOS</h1>
-  <div class="rule"><div class="ln"></div><div class="dm"></div><div class="ln"></div></div>
-  <div id="circleList">
-    <div class="hm far">PARAÍSO</div>
-    <div class="hm-sep"></div>
-    <div class="hm dead">IX — TRAIÇÃO</div>
-    <div class="hm dead">VIII — FRAUDE</div>
-    <div class="hm dead">VII — VIOLÊNCIA</div>
-    <div class="hm dead">VI — HERESIA</div>
-    <div class="hm dead">V — FÚRIA</div>
-    <div class="hm dead">IV — AVAREZA</div>
-    <div class="hm dead">III — FOME</div>
-    <div class="hm dead">II — DESEJO</div>
-    <div class="hm avail" id="circleLimbo">
-      <h3>I — ABISMO</h3>
-      <p>o falso paraíso. almas presas que não avançam nem desaparecem — catedrais sob um céu que não é céu.</p>
-      <div class="lvl" style="color:#bfd8e8">DESCER DIRETO — SEM LEVAR NADA</div>
+  <div class="lousaWrap">
+    <div class="lousa">
+      <div class="lu-eyebrow">O INFERNO SE DIVIDE — você acredita que conhece o caminho?</div>
+      <h1 class="lousaTitle">A DESCIDA — CARTOGRAFIA DO INFERNO</h1>
+      <div class="lousaSub">nove círculos. uma descida. nenhum retorno garantido.</div>
+      <div class="lousaBoard">
+        <svg id="lousaSvg" viewBox="0 0 980 640" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+          <defs>
+            <filter id="chalkWob" x="-6%" y="-6%" width="112%" height="112%">
+              <feTurbulence type="fractalNoise" baseFrequency="0.028" numOctaves="2" seed="7" result="n"/>
+              <feDisplacementMap in="SourceGraphic" in2="n" scale="3.2"/>
+            </filter>
+            <radialGradient id="pGlow">
+              <stop offset="0" stop-color="rgba(214,232,246,.13)"/>
+              <stop offset="1" stop-color="rgba(214,232,246,0)"/>
+            </radialGradient>
+          </defs>
+          <!-- pregos da moldura + sujeira da pedra (fora do filtro de giz) -->
+          <g>
+            <circle cx="26" cy="26" r="5" fill="#6b5433" stroke="#241708" stroke-width="1.4"/>
+            <circle cx="954" cy="26" r="5" fill="#6b5433" stroke="#241708" stroke-width="1.4"/>
+            <circle cx="26" cy="614" r="5" fill="#6b5433" stroke="#241708" stroke-width="1.4"/>
+            <circle cx="954" cy="614" r="5" fill="#6b5433" stroke="#241708" stroke-width="1.4"/>
+            <ellipse cx="180" cy="122" rx="46" ry="20" fill="rgba(220,230,225,.045)"/>
+            <ellipse cx="700" cy="560" rx="60" ry="22" fill="rgba(220,230,225,.04)"/>
+            <ellipse cx="250" cy="520" rx="34" ry="14" fill="rgba(214,226,220,.035)"/>
+            <ellipse cx="620" cy="120" rx="40" ry="16" fill="rgba(214,226,220,.03)"/>
+            <line x1="120" y1="580" x2="300" y2="596" stroke="rgba(236,229,210,.06)" stroke-width="2"/>
+            <line x1="640" y1="60" x2="800" y2="74" stroke="rgba(236,229,210,.05)" stroke-width="2"/>
+            <line x1="60" y1="300" x2="96" y2="332" stroke="rgba(236,229,210,.05)" stroke-width="1.4"/>
+          </g>
+          <g filter="url(#chalkWob)">
+            <text x="350" y="20" class="chT far">· PARAÍSO ·</text>
+            <!-- os nove anéis: I (fora) → IX (fundo). Bloqueados: traço apagado -->
+            <circle cx="350" cy="330" r="232" class="chRing hot"/>
+            <circle cx="350" cy="330" r="202" class="chRing ghost"/>
+            <circle cx="350" cy="330" r="172" class="chRing ghost"/>
+            <circle cx="350" cy="330" r="142" class="chRing ghost"/>
+            <circle cx="350" cy="330" r="114" class="chRing ghost"/>
+            <circle cx="350" cy="330" r="90"  class="chRing ghost"/>
+            <circle cx="350" cy="330" r="70"  class="chRing ghost"/>
+            <circle cx="350" cy="330" r="52"  class="chRing ghost"/>
+            <circle cx="350" cy="330" r="36"  class="chRing ghost"/>
+            <!-- o caminho da descida: espiral pontilhada dos anéis ao fundo -->
+            <path class="chPath" d="M350,98 L462,136 L537,222 L558,330 L523,430 L446,496 L350,513 L263,481 L206,413 L192,330 L220,255 L279,207 L350,196 L413,221 L452,271 L459,330 L438,381 L397,411 L350,415 L312,396 L291,364 L290,330 L305,304 L328,292 L350,294 L350,314"/>
+            <!-- setas de giz no caminho (mão livres, sem ícones modernos) -->
+            <path class="chArr" d="M552,320 L558,334 L566,324"/>
+            <path class="chArr" d="M185,338 L192,325 L200,337"/>
+            <path class="chArr" d="M452,320 L459,334 L467,324"/>
+            <path class="chArr" d="M283,338 L290,325 L298,337"/>
+            <!-- os nomes: cada ciclo no seu anel (nomenclatura real do jogo) -->
+            <text x="128" y="318" class="chT hot">I — ABISMO</text>
+            <text x="500" y="185" class="chT dead">II — DESEJO</text>
+            <text x="532" y="324" class="chT dead">III — FOME</text>
+            <text x="458" y="436" class="chT dead">IV — AVAREZA</text>
+            <text x="350" y="462" class="chT dead sm">V — FÚRIA</text>
+            <text x="262" y="404" class="chT dead sm">VI — HERESIA</text>
+            <text x="272" y="326" class="chT dead sm">VII — VIOLÊNCIA</text>
+            <text x="308" y="289" class="chT dead xs">VIII — FRAUDE</text>
+            <text x="350" y="296" class="chT dead xs">IX</text>
+            <text x="350" y="308" class="chT dead xs">TRAIÇÃO</text>
+            <!-- riscos vermelhos: caminhos lacrados (as páginas foram rasgadas) -->
+            <line x1="462" y1="180" x2="540" y2="182" class="chX"/>
+            <line x1="556" y1="318" x2="606" y2="321" class="chX"/>
+            <line x1="392" y1="456" x2="468" y2="458" class="chX"/>
+            <line x1="212" y1="322" x2="252" y2="325" class="chX"/>
+            <!-- símbolos de giz: identidade de cada região -->
+            <!-- I: o portal antigo (a entrada da descida) -->
+            <path class="chSym hot" d="M340,107 v-11 a10,11 0 0 1 20,0 v11"/>
+            <path class="chSym hot" d="M350,107 v-9"/>
+            <circle cx="336" cy="112" r="1" fill="rgba(244,238,220,.5)"/>
+            <circle cx="365" cy="110" r="1" fill="rgba(244,238,220,.4)"/>
+            <!-- II: fitas retorcidas (o vento que arranca o juízo) -->
+            <path class="chSym" d="M198,196 c6,-14 14,-2 20,-12 m-18,10 c6,-14 14,-2 20,-12"/>
+            <!-- III: a boca que nunca sacia -->
+            <path class="chSym" d="M168,326 a12,9 0 0 0 24,0 m-20,3 l0,4 m5,-5 l0,5 m5,-5 l0,5"/>
+            <!-- IV: a moeda rachada -->
+            <circle cx="250" cy="230" r="8" class="chSym"/>
+            <path class="chSym" d="M250,222 l3,5 -5,4 4,6"/>
+            <!-- V: a rachadura da fúria -->
+            <path class="chSym" d="M344,206 l5,7 -4,6 6,8"/>
+            <!-- VI: o sarcófago selado -->
+            <rect x="409" y="258" width="15" height="19" rx="2" class="chSym"/>
+            <path class="chSym" d="M409,265 h15 M416,270 v5 m-2.5,-2.5 h5"/>
+            <!-- VII: a arma partida -->
+            <path class="chSym" d="M412,330 h12 M432,333 h9 M424,326 l0,10"/>
+            <!-- VIII: o labirinto de caminhos falsos -->
+            <path class="chSym" d="M384,376 v-16 h16 v12 h-11 v-8 h6"/>
+            <!-- IX: a chave quebrada -->
+            <circle cx="343" cy="361" r="3.2" class="chSym"/>
+            <path class="chSym" d="M346,362 h9 M362,361 h4 M363,361 v4"/>
+            <!-- o fundo da descida: a mancha negra e a porta lacrada -->
+            <ellipse cx="350" cy="342" rx="24" ry="15" class="chStain"/>
+            <path d="M342,352 v-12 a8,8 0 0 1 16,0 v12 z" fill="rgba(8,10,9,.85)" stroke="rgba(236,229,210,.3)" stroke-width="1"/>
+            <path d="M342,344 h16 M342,349 h16" stroke="rgba(236,229,210,.28)" stroke-width="1.1" fill="none"/>
+            <!-- a PENUMBRA DAS ALMAS — FORA dos nove anéis, à direita:
+                 contorno aberto (nunca um anel), traço fino e frio -->
+            <path class="chP side" d="M582,330 C640,322 666,296 700,272"/>
+            <path class="chP" d="M697,277 v-9 a7,8 0 0 1 14,0 v9"/>
+            <ellipse cx="806" cy="252" rx="30" ry="36" fill="url(#pGlow)"/>
+            <path class="chP glow" d="M735,352 C733,258 756,204 806,198 C858,204 882,252 878,352"/>
+            <path class="chP ghost" d="M750,344 C748,268 768,222 806,216 C846,222 866,262 864,344"/>
+            <path class="chP glow" d="M806,232 C795,248 796,260 806,264 C816,260 817,248 806,232"/>
+            <path class="chP" d="M806,244 C802,251 802,257 806,259 C810,257 810,251 806,244"/>
+            <path class="chMist" d="M752,368 q7,-6 14,0 q7,6 14,0"/>
+            <path class="chMist" d="M796,374 q7,-6 14,0 q7,6 14,0"/>
+            <path class="chMist" d="M840,366 q6,-5 12,0"/>
+            <path class="chMist" d="M876,300 l7,10 -4,8"/>
+            <path class="chMist" d="M736,290 l-7,9 4,7"/>
+            <text x="806" y="392" class="chT xs px">· fora dos círculos ·</text>
+          </g>
+        </svg>
+        <button class="chalkCard" id="circleLimbo">
+          <h3>I — ABISMO</h3>
+          <p>o falso paraíso. almas presas que não avançam nem desaparecem — catedrais sob um céu que não é céu.</p>
+          <div class="lvl">LIMBO — DESCER DIRETO, SEM LEVAR NADA</div>
+        </button>
+        <button class="chalkCard" id="circleEscola" style="display:none">
+          <h3 style="letter-spacing:.35em">???</h3>
+          <p>há um lugar dos vivos esquecido dentro do inferno — uma página que não deveria estar no livro. a porta foi aberta para teste.</p>
+          <div class="lvl">ENTRAR NA ESCOLA — PORTA DE TESTE</div>
+        </button>
+        <button class="chalkOut" id="circlePenumbra">
+          <h3>FORA DOS CÍRCULOS</h3>
+          <div class="chName">PENUMBRA<br>DAS ALMAS</div>
+          <div class="lvl">a primeira descida</div>
+          <div class="lvl" id="lousaPenState"></div>
+        </button>
+      </div>
+      <div class="lousaLegend">
+        <span>✕ caminho lacrado</span>
+        <span>···· caminho da descida</span>
+        <span>✓ descida concluída</span>
+        <span class="lgP">— anotação fora dos círculos</span>
+      </div>
+      <div class="lousaInfo" id="lousaInfo"><span class="liTag">passe o giz pelas inscrições — o que estiver lacrado não cede.</span></div>
+      <div class="optNote lousaNote" style="margin-top:10px">Aviso: ao entrar no ABISMO diretamente, o personagem NÃO carrega itens, bênçãos ou progressão anterior. Os círculos apagados foram selados na lousa — as páginas que falavam deles foram rasgadas do livro.</div>
+      <button class="mini" id="circlesBack" style="margin-top:12px">VOLTAR</button>
     </div>
-    <div class="hm avail" id="circleEscola" style="display:none">
-      <h3 style="letter-spacing:.35em">???</h3>
-      <p>há um lugar dos vivos esquecido dentro do inferno — uma página que não deveria estar no livro. a porta foi aberta para teste.</p>
-      <div class="lvl" style="color:#e6dac4">ENTRAR NA ESCOLA — PORTA DE TESTE</div>
-    </div>
-    <div class="hm avail" id="circlePenumbra">
-      <h3>LIMBO — PENUMBRA DAS ALMAS</h3>
-      <p>primeira etapa da descida. sombras, almas perdidas, escuridão.</p>
-      <div class="lvl" style="color:#e6dac4">A DESCIDA COMEÇA AQUI</div>
-    </div>
-    <div class="hm-sep"></div>
-    <div class="hm dead" style="letter-spacing:.4em">LIMBO</div>
   </div>
-  <div class="optNote" style="margin-top:14px;color:#9c8f7c">Aviso: ao entrar no ABISMO diretamente, o personagem NÃO carrega itens, bênçãos ou progressão anterior.</div>
-  <button class="mini" id="circlesBack" style="margin-top:18px">VOLTAR</button>
 </div>
 
 <!-- ===================== SELEÇÃO DE ARMA ===================== -->
@@ -140,7 +268,12 @@
   <h1 id="weaponsTitle">PENUMBRA DAS ALMAS</h1>
   <div class="rule"><div class="ln"></div><div class="dm"></div><div class="ln"></div></div>
   <div class="sub" id="weaponsSub">escolha sua arma inicial</div>
-  <div class="cards">
+  <!-- v1.6.2: CARROSSEL DE ARMAS — uma arma por vez; ◀ ▶ nas laterais
+       (ou as SETAS do teclado) trocam o lado; ENTER/ESPAÇO confirma;
+       os pontos embaixo pulam direto para uma arma -->
+  <div class="wCarousel">
+    <button class="wNav" id="wPrev" aria-label="arma anterior" title="arma anterior (←)">◀</button>
+    <div class="cards">
     <div class="card" id="wShot">
       <svg viewBox="0 0 24 24" fill="none" stroke="#e6dac4" stroke-width="1.5"><path d="M3 12h18M3 12l5-5M3 12l5 5"/></svg>
       <h3>TROVÃO DISTANTE</h3>
@@ -190,7 +323,10 @@
       <p>dispara teclas — CTRL trava o tempo, ESC apaga balas. aleatório, mas controlado.</p>
       <div class="lvl" style="color:#9fd8ff">CAÓTICA · EVOLUI: TEMPESTADE DE TECLAS</div>
     </div>
+    </div>
+    <button class="wNav" id="wNext" aria-label="próxima arma" title="próxima arma (→)">▶</button>
   </div>
+  <div class="wDots" id="wDots"></div>
   <div class="diff">
     <button class="diffBtn sel" id="dNorm">NORMAL</button>
     <button class="diffBtn" id="dHard">HARD</button>
@@ -241,16 +377,6 @@
   <button class="mini" id="futureBossesBtn">BOSSES FUTUROS</button>
 </div>
 
-<!-- ===================== FIM DOS CÍRCULOS (v1.6.1 — o buraco da luxuria) ===================== -->
-<div id="placaFim" class="overlay hidden solid">
-  <div class="lu-eyebrow">O BURACO SE FECHA ATRÁS DE VOCÊ</div>
-  <h1 style="font-size:clamp(34px,4.5vw,50px)">fim dos circulos por um momento</h1>
-  <div class="rule"><div class="ln"></div><div class="dm"></div><div class="ln"></div></div>
-  <div class="sub">continue para o modo infinito ou volte pro menu</div>
-  <button class="btn" id="placaInfBtn">CONTINUAR — MODO INFINITO</button>
-  <button class="mini" id="placaMenuBtn">VOLTAR AO MENU</button>
-</div>
-
 <!-- ===================== BOSSES FUTUROS ===================== -->
 <div id="futureBosses" class="overlay hidden solid">
   <div class="lu-eyebrow">CONTEÚDO FUTURO</div>
@@ -278,7 +404,7 @@
       <span>ESQUERDA</span><button class="kbBtn" data-kb="left">SETA ESQ</button>
       <span>DIREITA</span><button class="kbBtn" data-kb="right">SETA DIR</button>
       <span>INVESTIDA</span><button class="kbBtn" data-kb="dash">SHIFT</button>
-      <span style="grid-column:1/3;font-size:8px;line-height:1.5;color:#8f8478">v1.6.5 — o atalho ao cinza: botão novo O LIMBO CINZA · TESTE cai direto na ÚLTIMA fase do limbo...? (a placa do primeiro pecado) sem descer andar nenhum · o caminho normal segue igual · v1.6.4 intacto: hitbox de um tiro (5) e ponto vermelho só no SHIFT</span>
+      <span style="grid-column:1/3;font-size:8px;line-height:1.5;color:#8f8478">v1.9.2 — a introdução cinematográfica: depois da abertura, a câmera mergulha no manuscrito (o abismo, o Inferno em camadas, Thor acordando, a margem que se escreve sozinha) e o INICIAR revela-se sobre o corredor final · pulável, toca uma vez · o livro vivo continua: cada opção vira uma folha com aproximação de câmera própria · CÍRCULOS fecha o livro e mostra a LOUSA com os nove círculos a giz + a PENUMBRA DAS ALMAS fora do desenho · menu mais leve: o mundo atrás do menu não é desenhado, velas/poeira dormem quando outra tela cobre o livro · abertura pulável, conteúdo já escrito, registro das almas, página de ajustes, ANIMAÇÕES DO LIVRO nas OPÇÕES · EDITOR DE MODS segue fora do jogo (forja = mod-studio.html)</span>
       <span>ITEM ATIVO</span><button class="kbBtn" data-kb="active">ESPAÇO</button>
       <span>INTERAGIR</span><button class="kbBtn" data-kb="interact">Z</button>
       <span>PAUSA</span><button class="kbBtn" data-kb="pause">ESC</button>
@@ -418,11 +544,11 @@
 </div>
 
 <!-- ===================== BOTÃO v0.9.0 — INFO DA ATUALIZAÇÃO ===================== -->
-<button id="versionBtn" style="display:none;position:fixed;right:14px;bottom:14px;z-index:30;background:rgba(10,7,8,.65);border:1px solid #3a332c;color:#9c8f7c;font:600 9px 'IBM Plex Mono',monospace;letter-spacing:.12em;padding:7px 11px;cursor:pointer;transition:.16s">v1.6.5 · O ATALHO AO CINZA</button>
+<button id="versionBtn" style="display:none;position:fixed;right:14px;bottom:14px;z-index:30;background:rgba(10,7,8,.65);border:1px solid #3a332c;color:#9c8f7c;font:600 9px 'IBM Plex Mono',monospace;letter-spacing:.12em;padding:7px 11px;cursor:pointer;transition:.16s">v1.9.2 · A INTRODUÇÃO CINEMATOGRÁFICA</button>
 
 <div id="versionInfo" class="overlay hidden solid">
   <div class="lu-eyebrow">ATUALIZAÇÃO</div>
-  <h1 style="font-size:clamp(34px,4.5vw,50px)">v1.6.5 — O ATALHO AO CINZA</h1>
+  <h1 style="font-size:clamp(34px,4.5vw,50px)">v1.9.2 — A INTRODUÇÃO CINEMATOGRÁFICA</h1>
   <div class="rule"><div class="ln"></div><div class="dm"></div><div class="ln"></div></div>
   <div id="versionInfoBody" style="max-width:680px;max-height:64vh;overflow-y:auto;text-align:left;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#9c8f7c;line-height:1.9;letter-spacing:.04em;padding:8px"></div>
   <button class="mini" id="versionInfoClose" style="margin-top:14px">FECHAR</button>
@@ -436,12 +562,16 @@ window.addEventListener('error',function(e){
   if(window.__ERRS.length<50)window.__ERRS.push(String((e&&e.message)||e));
 });
 </script>
-<script src="assets/sprites/sprites.js?v=165"></script>
-<script src="audio.js?v=165"></script>
-<script src="game.js?v=165"></script>
-<script src="school.js?v=165"></script>
-<script src="castelo.js?v=165"></script>
-<script src="expansion.js?v=165"></script>
-<script src="remaster.js?v=165"></script>
+<script src="assets/sprites/sprites.js?v=192"></script>
+<script src="audio.js?v=192"></script>
+<script src="game.js?v=192"></script>
+<script src="school.js?v=192"></script>
+<script src="castelo.js?v=192"></script>
+<script src="expansion.js?v=192"></script>
+<script src="remaster.js?v=192"></script>
+<script src="grimoria.js?v=192"></script>
+<script src="livro.js?v=192"></script>
+<script src="intro.js?v=192"></script>
+<script src="mods.js?v=192"></script>
 </body>
 </html>

@@ -1,7 +1,15 @@
 *{margin:0;padding:0;box-sizing:border-box}
-html,body{height:100%;overflow:hidden;background:#050304}
+html,body{height:100%;overflow:hidden;overscroll-behavior:none;background:#050304}
 #cv{position:fixed;inset:0;display:block}
-.overlay{position:fixed;inset:0;z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;background:rgba(8,5,7,.5);transition:opacity .45s}
+/* v1.6.1: ENCAIXE TOTAL — overlays maiores que a tela rolam POR DENTRO (a
+   página nunca tem barra de rolagem). O centrador de sempre virou pseudo-itens
+   de margem automática: quando cabe, tudo centrado igual antes; quando não
+   cabe, o conteúdo fica alcançável rolando — nenhum botão cortado. */
+.overlay{position:fixed;inset:0;z-index:10;display:flex;flex-direction:column;align-items:center;text-align:center;background:rgba(8,5,7,.5);transition:opacity .45s;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:#3a332c transparent}
+.overlay::before,.overlay::after{content:'';margin:auto 0;flex:0 0 1px}
+.overlay::-webkit-scrollbar{width:8px}
+.overlay::-webkit-scrollbar-thumb{background:#3a332c}
+.overlay::-webkit-scrollbar-track{background:transparent}
 .overlay.hidden{opacity:0;pointer-events:none;visibility:hidden;transition:opacity .45s,visibility 0s .45s}
 .overlay.solid{background:rgba(8,5,7,.84)}
 /* v1.1.2: a seleção de arma é opaca — o Cérbero do menu antigo não aparece atrás */
@@ -28,6 +36,20 @@ h1{font-family:'Pirata One',serif;font-weight:400;color:#e6dac4;font-size:clamp(
 .diffBtn.sel{border-color:#a52a3a;color:#e6dac4;background:rgba(165,42,58,.22);position:relative;z-index:1}
 .diffHint{font-family:'IBM Plex Mono',monospace;font-size:11px;color:#6e6357;margin-top:14px;letter-spacing:.08em;line-height:1.8;max-width:460px}
 .cards{display:flex;gap:18px;margin-top:30px;flex-wrap:wrap;justify-content:center}
+/* v1.6.2: CARROSSEL DE ARMAS — uma arma por vez. O overlay #weapons ganha a
+   classe .carousel no boot; os botões ◀ ▶ (e as setas do teclado) trocam a
+   carta visível, e os pontos pulam direto. Fora do #weapons, .cards segue igual. */
+#weapons .wCarousel{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:26px;width:100%;max-width:100%}
+#weapons .cards{margin-top:0;flex-wrap:nowrap;flex:0 0 auto;align-items:stretch}
+#weapons.carousel .card{display:none}
+#weapons.carousel .card.cur{display:block;animation:wCardIn .18s ease}
+@keyframes wCardIn{from{opacity:0;transform:translateX(var(--wdir,0px))}to{opacity:1;transform:translateX(0)}}
+#weapons .wNav{flex:0 0 auto;width:48px;height:66px;background:rgba(13,9,11,.94);border:1px solid #574f45;color:#e6dac4;font-family:'IBM Plex Mono',monospace;font-size:19px;line-height:1;cursor:pointer;transition:.16s;padding:0}
+#weapons .wNav:hover{border-color:#8a7f6d;color:#fffdf4;transform:translateY(-2px)}
+#weapons .wDots{display:flex;gap:9px;justify-content:center;margin-top:16px}
+#weapons .wDot{width:9px;height:9px;border-radius:50%;background:#3a332c;border:1px solid #574f45;padding:0;cursor:pointer;transition:.16s}
+#weapons .wDot:hover{border-color:#8a7f6d}
+#weapons .wDot.cur{background:#e6dac4;border-color:#e6dac4;transform:scale(1.25)}
 .card{width:232px;padding:26px 20px 22px;background:rgba(13,9,11,.94);border:1px solid #574f45;cursor:pointer;text-align:center;transition:.16s;font-family:'IBM Plex Mono',monospace}
 #weapons .card{width:270px;padding:32px 24px 28px}
 #lab .card{width:200px;padding:20px 14px 18px}
@@ -46,6 +68,11 @@ h1{font-family:'Pirata One',serif;font-weight:400;color:#e6dac4;font-size:clamp(
 #lab .card h3{font-size:19px}
 .card p{font-size:11px;color:#9c8f7c;line-height:1.7;letter-spacing:.03em}
 .card .lvl{margin-top:12px;font-size:10px;letter-spacing:.28em}
+/* v1.6.3: LOJA DO ERRANTE — bênção selecionada em DESTAQUE TOTAL: a carta acende
+   num fundo claro, a moldura vira azul e o NOME fica AZUL-ESCURO, bem legível */
+#shop .card:hover,#shop .card:active{background:#e9ecf2;border-color:#2c5fb8;transform:translateY(-5px);box-shadow:0 0 30px rgba(70,120,220,.4)}
+#shop .card:hover h3,#shop .card:active h3{color:#0c2d6b}
+#shop .card:hover p,#shop .card:active p{color:#3a3126}
 .card.q6{border-width:2px}
 #muteBtn{position:fixed;top:14px;right:14px;z-index:20;width:38px;height:38px;display:flex;align-items:center;justify-content:center;background:rgba(10,7,8,.65);border:1px solid #3a332c;color:#e6dac4;cursor:pointer}
 #muteBtn:hover{border-color:#a52a3a}
@@ -313,4 +340,410 @@ em.latim{font-style:italic;color:#8a7a5e}
   font-weight:400;
   font-display:swap;
   src:url('assets/fonts/IM-Fell-English-SC.ttf') format('truetype');
+}
+
+/* ============================================================
+   v1.9.0 — O GRIMÓRIO: o menu agora é um LIVRO ANTIGO ABERTO
+   papiro envelhecido · tinta escura · dobra central · ornamentos
+   (os botões continuam os mesmos elementos, mesmos IDs, funcionais)
+   ============================================================ */
+#menu{background:
+  radial-gradient(90% 70% at 50% 42%,#150e08 0%,#0b0705 55%,#030202 100%)}
+/* v1.9.1 DESEMPENHO: o drop-shadow aqui (e no #bookUnit) forçava o livro
+   inteiro a ser RE-FILTRADO a cada repaint interno (viradas de página,
+   hover, respiração do idle) — a sombra agora é uma POÇA ESTÁTICA em
+   #bookCam::before, pintada uma única vez. */
+#bookMenu{position:relative;z-index:3;display:flex;align-items:stretch;justify-content:center;
+  width:min(1020px,94vw);margin:6px auto 0}
+#bookMenu .pg{position:relative;flex:1 1 0;min-width:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;
+  padding:20px 22px 24px;border-radius:10px 4px 4px 10px;
+  background:
+    radial-gradient(140% 90% at 50% 0%,rgba(255,236,190,.10),transparent 55%),
+    repeating-linear-gradient(94deg,rgba(120,92,52,.05) 0 3px,rgba(90,66,38,.03) 3px 7px),
+    repeating-linear-gradient(2deg,rgba(120,92,52,.04) 0 5px,rgba(90,66,38,.02) 5px 11px),
+    radial-gradient(120% 120% at 20% 15%,#d8c69c 0%,#c3ae82 34%,#a8915f 72%,#8f7a4e 100%);
+  box-shadow:inset 0 0 60px rgba(58,40,18,.55),inset 0 0 6px rgba(40,26,10,.6);
+  border:1px solid #5a4626}
+#bookMenu .pg::after{content:"";position:absolute;inset:6px;border:1px solid rgba(92,66,30,.35);border-radius:6px;pointer-events:none;
+  box-shadow:inset 0 0 0 1px rgba(255,240,200,.12)}
+#bookMenu .pgL{border-radius:12px 4px 4px 12px}
+#bookMenu .pgR{border-radius:4px 12px 12px 4px}
+/* manchas, vincos e dedos */
+#bookMenu .pgL::before{content:"";position:absolute;inset:0;pointer-events:none;border-radius:inherit;background:
+  radial-gradient(26% 20% at 82% 8%,rgba(92,58,24,.22),transparent 70%),
+  radial-gradient(18% 14% at 12% 84%,rgba(74,46,20,.18),transparent 70%),
+  radial-gradient(10% 7% at 66% 92%,rgba(120,80,40,.14),transparent 70%)}
+#bookMenu .pgR::before{content:"";position:absolute;inset:0;pointer-events:none;border-radius:inherit;background:
+  radial-gradient(24% 18% at 14% 10%,rgba(92,58,24,.20),transparent 70%),
+  radial-gradient(20% 15% at 88% 78%,rgba(74,46,20,.16),transparent 70%)}
+/* a dobra central */
+#bookMenu .fold{flex:0 0 26px;position:relative;
+  background:linear-gradient(90deg,rgba(40,26,10,0) 0%,rgba(40,26,10,.42) 44%,rgba(16,10,4,.62) 50%,rgba(40,26,10,.42) 56%,rgba(40,26,10,0) 100%)}
+#bookMenu .fold::before{content:"";position:absolute;top:0;bottom:0;left:50%;width:1px;background:rgba(20,12,4,.8)}
+#bookMenu .pgIn{display:flex;flex-direction:column;align-items:center;text-align:center;min-height:100%}
+/* tipografia de manuscrito sobre pergaminho */
+#menu .pg h1{color:#2b1d10;text-shadow:0 1px 0 rgba(255,240,200,.35);font-size:clamp(30px,4.2vw,50px)}
+#menu .pg .rule .ln{background:#6e4f26}
+#menu .pg .rule .dm{background:#8a2f22}
+#menu .pg .sub{color:#4a3820;text-transform:none;letter-spacing:.1em;font-family:'IM Fell English SC',serif;font-size:14px}
+#menu .pg .sub.dante{color:#5c4324;font-style:italic}
+/* as opções escritas no livro — sem molduras modernas: entradas de manuscrito */
+#menu .pg .btn,#menu .pg .mini{position:relative;background:none;border:none;padding:7px 30px;margin-top:2px;
+  font-family:'IM Fell English SC',serif;font-weight:400;letter-spacing:.16em;text-transform:none;
+  color:#3a2812;font-size:19px;line-height:1.35;cursor:pointer;transition:.16s;border-radius:4px}
+#menu .pg .btn{font-size:26px;color:#221408;margin-top:10px}
+#menu .pg .btn:hover,#menu .pg .mini:hover{color:#7a1c10;background:rgba(122,28,16,.08)}
+#menu .pg .btn:hover::before,#menu .pg .mini:hover::before{content:"❧";position:absolute;left:2px;top:50%;transform:translateY(-54%);color:#7a1c10;font-size:14px}
+#menu .pg .mini{font-size:15px;color:#4a3820}
+#menu .pg .mini.quit{color:#8a2f22}
+#menu .pg .mini.quit:hover{color:#a52a3a;background:rgba(138,47,34,.10)}
+/* anotações de quem estudou o livro depois */
+#menu #metaList{color:#5c4a2c;font-size:9px}
+#menu #metaList b{color:#2b1d10}
+#menu #danteLine{color:#5c4324}
+#menu #menuClose{color:#5c4a2c;font-size:11px}
+#menu #menuClose span{color:#7a6640}
+#menu #menuClose b{color:#3a2812}
+#menuNews{
+  font-family:'IM Fell English SC',serif;font-size:10.5px;letter-spacing:.04em;line-height:1.55;
+  color:#4a3820;max-width:420px;margin:8px auto 4px;
+  border-top:1px dashed rgba(92,66,30,.5);border-bottom:1px dashed rgba(92,66,30,.5);
+  padding:6px 8px;cursor:pointer;transition:.16s;text-align:center;background:rgba(255,236,190,.10)}
+#menuNews:hover{color:#7a1c10;background:rgba(122,28,16,.07)}
+#menu .pg .pgHead{font-family:'Metamorphous',serif;font-size:12px;letter-spacing:.34em;color:#6e4f26;margin:4px 0 10px}
+/* Ornamento central da dobra: selo dos círculos */
+#bookMenu .fold::after{content:"✠";position:absolute;top:44%;left:50%;transform:translate(-50%,-50%);
+  font-family:'Metamorphous',serif;font-size:13px;color:rgba(122,40,24,.75);text-shadow:0 0 6px rgba(255,230,180,.3)}
+/* v1.1.0 idle: o livro respira devagar (substitui o mergulho do portão) */
+#menu.menu-idle #bookMenu{transform:translateY(6px) scale(1.012);transition:transform 14s linear}
+/* responsivo: em telas estreitas o livro vira uma página única rolável */
+@media (max-width:860px){
+  #bookMenu{flex-direction:column;width:min(560px,96vw)}
+  #bookMenu .pgL{border-radius:10px 10px 4px 4px}
+  #bookMenu .pgR{border-radius:4px 4px 10px 10px}
+  #bookMenu .fold{flex:0 0 14px;background:linear-gradient(180deg,rgba(40,26,10,0) 0%,rgba(40,26,10,.35) 50%,rgba(40,26,10,0) 100%)}
+  #bookMenu .fold::after{display:none}
+  #bookMenu .pg{max-height:46vh}
+  #menu .pg .btn{font-size:22px}
+  #menu .pg .mini{font-size:13px}
+  #menu .pg h1{font-size:clamp(26px,7vw,40px)}
+}
+
+/* ============================================================
+   v1.9.1 — O LIVRO VIVO · A LOUSA DOS CÍRCULOS
+   mesa de carvalho · duas velas · poeira · capa com lombada ·
+   pilha de páginas (espessura) · folha que vira com sombra ·
+   spreads (mapa, registro das almas, ajustes) · modo página ·
+   lousa de giz (os nove círculos + a penumbra fora do desenho)
+   ============================================================ */
+/* ---- a mesa (pintada 1× no canvas; só as chamas se movem) ---- */
+#tableScene{position:absolute;inset:0;z-index:0;pointer-events:none}
+#tableCv{position:absolute;inset:0;width:100%;height:100%}
+#dustCv{position:absolute;left:12%;top:6%;width:76%;height:70%}
+.candle{position:absolute;width:56px;height:190px;z-index:1}
+.candle.cl{left:6%;bottom:9%}
+.candle.cr{right:7%;bottom:12%;transform:scale(.88)}
+.cwax{position:absolute;left:50%;bottom:34px;width:18px;height:76px;margin-left:-9px;background:linear-gradient(90deg,#cfc3a2,#efe6cd 45%,#b7ab8a);border-radius:7px 7px 3px 3px;box-shadow:0 6px 14px rgba(0,0,0,.5)}
+.cwax::before{content:"";position:absolute;left:1px;top:-8px;width:5px;height:24px;background:linear-gradient(#efe6cd,#d8ccab);border-radius:3px}
+.cwax::after{content:"";position:absolute;right:2px;top:-4px;width:4px;height:14px;background:linear-gradient(#e6dabd,#cfc3a2);border-radius:3px}
+.chold{position:absolute;left:50%;bottom:22px;width:54px;height:16px;margin-left:-27px;border-radius:50%;background:radial-gradient(ellipse at 50% 38%,#8a6d3a,#4a3416 70%,#241705);box-shadow:0 3px 9px rgba(0,0,0,.6)}
+.cflame{position:absolute;left:50%;bottom:104px;width:40px;height:58px;margin-left:-20px}
+.cglass{position:absolute;left:50%;bottom:26px;width:180px;height:180px;margin-left:-90px;border-radius:50%;background:radial-gradient(circle,rgba(255,176,88,.2),rgba(255,150,60,.07) 45%,transparent 68%);animation:cgFlick 6.5s ease-in-out infinite}
+.candle.cr .cglass{animation-delay:-3.2s}
+@keyframes cgFlick{0%,100%{opacity:.85;transform:scale(1)}38%{opacity:1;transform:scale(1.06)}62%{opacity:.76;transform:scale(.97)}}
+
+/* ---- o palco 3D: o livro fica MAIOR e com espessura ---- */
+#bookStage{position:relative;z-index:3;width:min(1180px,97vw);margin:10px auto 0}
+#bookCam{will-change:transform;pointer-events:none}
+#bookStage,#bookUnit{pointer-events:none}
+#bookUnit{position:relative;perspective:1900px;perspective-origin:50% 42%}
+/* v1.9.1: a sombra do livro virou poça estática (0 custo por quadro;
+   acompanha a câmera porque vive dentro dela) */
+#bookCam::before{content:"";position:absolute;left:-6%;right:-6%;top:12%;bottom:-11%;z-index:-1;pointer-events:none;
+  background:radial-gradient(ellipse at 50% 60%,rgba(0,0,0,.62),rgba(0,0,0,.38) 44%,rgba(0,0,0,0) 72%)}
+#bookMenu,#bkSpread{pointer-events:auto}
+#bookMenu{width:100%;margin:0;filter:none;position:relative;z-index:2}
+#bookMenu .pg{min-height:min(590px,66vh)}
+/* contracapa + a ESPESURA das páginas (borda direita e inferior) */
+#bkBack,#bkStackR,#bkStackB,#bkSpread .fold{pointer-events:none}
+#bkBack{position:absolute;inset:-7px -10px -12px -9px;border-radius:12px;background:linear-gradient(115deg,#1d1209,#2b1a0e 45%,#140b05);border:1px solid #0a0603;z-index:0;box-shadow:0 5px 0 #0b0704,0 16px 40px rgba(0,0,0,.5)}
+#bkStackR{position:absolute;top:6px;bottom:9px;right:-8px;width:10px;z-index:1;border-radius:0 4px 4px 0;background:repeating-linear-gradient(180deg,#d8c69c 0 2px,#b3a17a 2px 3px,#e2d2ac 3px 5px);box-shadow:1px 0 2px rgba(0,0,0,.45)}
+#bkStackB{position:absolute;left:9px;right:-7px;bottom:-9px;height:10px;z-index:1;border-radius:0 0 5px 2px;background:repeating-linear-gradient(90deg,#cbb98e 0 2px,#a8915f 2px 3px,#d8c69c 3px 5px)}
+/* ---- o spread sob a folha ---- */
+#bkSpread{position:absolute;inset:0;z-index:3;display:none}
+#bkSpread .pg{position:relative;flex:1 1 0;min-width:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;padding:20px 22px 24px;border-radius:10px 4px 4px 10px;
+  background:
+    radial-gradient(140% 90% at 50% 0%,rgba(255,236,190,.10),transparent 55%),
+    repeating-linear-gradient(94deg,rgba(120,92,52,.05) 0 3px,rgba(90,66,38,.03) 3px 7px),
+    repeating-linear-gradient(2deg,rgba(120,92,52,.04) 0 5px,rgba(90,66,38,.02) 5px 11px),
+    radial-gradient(120% 120% at 20% 15%,#d8c69c 0%,#c3ae82 34%,#a8915f 72%,#8f7a4e 100%);
+  box-shadow:inset 0 0 60px rgba(58,40,18,.55),inset 0 0 6px rgba(40,26,10,.6);border:1px solid #5a4626}
+#bkSpread .pgL{border-radius:12px 4px 4px 12px}
+#bkSpread .pgR{border-radius:4px 12px 12px 4px}
+#bkSpread .fold{flex:0 0 26px;position:relative;background:linear-gradient(90deg,rgba(40,26,10,0) 0%,rgba(40,26,10,.42) 44%,rgba(16,10,4,.62) 50%,rgba(40,26,10,.42) 56%,rgba(40,26,10,0) 100%)}
+#bkSpread .pgIn{display:flex;flex-direction:column;align-items:center;text-align:center;min-height:100%}
+.spHead{font-family:'Metamorphous',serif;font-size:13px;letter-spacing:.34em;color:#6e4f26;margin:6px 0 8px}
+.spSub{font-family:'IM Fell English SC',serif;font-size:13px;color:#5c4324;font-style:italic;margin-bottom:8px}
+.spNote{font-family:'Special Elite',cursive;font-size:11.5px;line-height:1.75;color:#5c4a2c;margin:12px 10px;opacity:.9}
+.spNote.ink{color:#3a2812;transform:rotate(-.6deg)}
+.spNote.scrap{text-decoration:line-through;opacity:.55}
+/* ---- a FOLHA que vira ---- */
+#bkLeaf{position:absolute;top:-2px;bottom:-2px;display:none;transform-style:preserve-3d;will-change:transform;z-index:30}
+#bkLeaf .lf{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border:1px solid #5a4626;
+  background:
+    radial-gradient(140% 90% at 50% 0%,rgba(255,236,190,.12),transparent 55%),
+    repeating-linear-gradient(94deg,rgba(120,92,52,.05) 0 3px,rgba(90,66,38,.03) 3px 7px),
+    radial-gradient(120% 120% at 30% 15%,#dcc99e 0%,#c9b488 40%,#ab9464 75%,#937e52 100%);
+  box-shadow:inset 0 0 46px rgba(58,40,18,.5)}
+.lfF{border-radius:4px 12px 12px 4px;box-shadow:inset 12px 0 26px rgba(60,42,20,.32),inset 0 0 40px rgba(58,40,18,.45)}
+.lfB{transform:rotateY(180deg);border-radius:12px 4px 4px 12px;box-shadow:inset -12px 0 26px rgba(60,42,20,.32),inset 0 0 40px rgba(58,40,18,.45);background-size:cover;background-position:center;background-repeat:no-repeat}
+.lfSh{position:absolute;inset:0;pointer-events:none;opacity:0;background:linear-gradient(90deg,rgba(8,4,2,.62),rgba(8,4,2,.18) 46%,transparent 70%)}
+/* ---- a CAPA (couro gasto, lombada, ✠) ---- */
+#bkCover{position:absolute;inset:-3px;transform-origin:left center;transform-style:preserve-3d;z-index:40;border:2px solid #0d0805;border-radius:8px 14px 14px 8px;
+  background:linear-gradient(118deg,#241610 0%,#332114 34%,#1a100a 70%,#2b1a10 100%);
+  box-shadow:inset 0 0 52px rgba(0,0,0,.88),0 20px 60px rgba(0,0,0,.7);will-change:transform}
+/* v1.9.1: a capa já carrega box-shadow estático próprio — o filter em
+   movimento re-filtrava a capa por quadro (saiu; .bkLift segue existindo
+   como gancho sem custo) */
+.cvIn{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;transition:opacity .3s}
+.cvSym{font-family:'Metamorphous',serif;font-size:38px;color:#8a6d3a;text-shadow:0 0 16px rgba(138,109,58,.45)}
+.cvT{font-family:'Pirata One',serif;font-size:clamp(34px,4vw,48px);color:#c9b08a;letter-spacing:.16em;text-shadow:0 2px 0 #000}
+.cvT2{font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.5em;color:#a52a3a}
+.cvSub{font-family:'IM Fell English SC',serif;font-size:12px;color:#6e5a3a;letter-spacing:.22em;margin-top:5px}
+.cvSpine{position:absolute;left:0;top:0;bottom:0;width:30px;border-radius:6px 0 0 6px;background:linear-gradient(90deg,rgba(0,0,0,.72),rgba(255,220,160,.07) 55%,rgba(0,0,0,.4))}
+.cvWear{position:absolute;inset:0;border-radius:inherit;pointer-events:none;background:
+  radial-gradient(18% 12% at 96% 4%,rgba(90,58,28,.35),transparent 70%),
+  radial-gradient(14% 10% at 4% 96%,rgba(70,44,20,.3),transparent 70%),
+  radial-gradient(30% 18% at 50% 50%,rgba(255,220,160,.05),transparent 70%)}
+#bkCover.cv-open{background:linear-gradient(118deg,#1c110a 0%,#241610 50%,#150c07 100%)}
+#bkCover.cv-open .cvIn{opacity:0}
+/* ---- o véu da abertura ---- */
+#bkDim{position:absolute;inset:0;z-index:45;pointer-events:none;background:radial-gradient(90% 70% at 50% 46%,rgba(6,3,2,.55) 0%,rgba(3,1,1,.86) 60%,#010101 100%);opacity:0}
+#menu.book-dim #bookStage{opacity:.5;filter:brightness(.72);transition:opacity .3s,filter .3s}
+
+/* ---- O REGISTRO DAS ALMAS: os saves como inscrições ---- */
+.soulRec{margin:10px 6px;padding:10px 13px;border:1px solid rgba(92,66,30,.5);border-radius:6px;background:rgba(255,240,200,.06);text-align:left;position:relative;transition:.2s}
+.soulRec.cur{border-color:#7a1c10;box-shadow:0 0 0 1px rgba(122,28,16,.35),inset 0 0 18px rgba(122,28,16,.06)}
+.soulRec.empty{opacity:.55}
+.soulRec.burned{border-color:#5a1f14;background:rgba(90,31,20,.08)}
+.srName{font-family:'IM Fell English SC',serif;font-size:15px;color:#2b1d10;letter-spacing:.04em}
+.srRow{font-family:'IM Fell English SC',serif;font-size:12px;color:#4a3820;letter-spacing:.04em;margin-top:2px}
+.srRow.dim{color:#7a6640;font-size:10.5px}
+.srK{color:#7a1c10;letter-spacing:1px}
+.srBtns{margin-top:7px;display:flex;gap:8px;flex-wrap:wrap}
+.srB{font-family:'IM Fell English SC',serif;font-size:12.5px;color:#3a2812;background:none;border:1px solid rgba(92,66,30,.55);border-radius:4px;padding:4px 12px;cursor:pointer;transition:.15s}
+.srB:hover{color:#7a1c10;border-color:#7a1c10;background:rgba(122,28,16,.07)}
+.srB.bad{color:#8a2f22}
+.srB.wide{margin:9px auto 0;display:block;min-width:230px;font-size:14px;padding:7px 18px}
+
+/* ---- OPÇÕES como página do livro (pousa sobre o spread) ---- */
+#options.asPage{background:rgba(5,3,2,.44)}
+#options.asPage .optPanel{background:linear-gradient(160deg,#d3c197,#c3ae82 40%,#a8915f);border:1px solid #5a4626;border-radius:10px;padding:22px 26px;box-shadow:0 24px 60px rgba(0,0,0,.6),inset 0 0 44px rgba(58,40,18,.4);min-width:min(520px,92vw)}
+#options.asPage h1{color:#2b1d10;text-shadow:0 1px 0 rgba(255,240,200,.35)}
+#options.asPage .rule .ln{background:#6e4f26}
+#options.asPage .rule .dm{background:#8a2f22}
+#options.asPage .optLbl{color:#3a2812}
+#options.asPage .optVal{color:#2b1d10}
+#options.asPage .optSep{color:#7a1c10}
+#options.asPage input[type=range]{background:rgba(58,40,18,.5)}
+#options.asPage input[type=range]::-webkit-slider-thumb{background:#7a1c10;border-color:#e6dac4}
+#options.asPage input[type=range]::-moz-range-thumb{background:#7a1c10;border-color:#e6dac4}
+#options.asPage .optChk{color:#3a2812;border-color:rgba(92,66,30,.6)}
+#options.asPage .optChk.sel{color:#7a1c10;border-color:#7a1c10;background:rgba(122,28,16,.08)}
+#options.asPage .kbGrid{color:#4a3820}
+#options.asPage .kbGrid span{color:#4a3820}
+#options.asPage .kbBtn{color:#2b1d10;border-color:rgba(92,66,30,.55);background:rgba(255,240,200,.05)}
+#options.asPage .kbBtn:hover{border-color:#7a1c10}
+#options.asPage .optNote{color:#5c4a2c}
+#options.asPage .btn{color:#2b1d10;border-color:rgba(92,66,30,.6)}
+#options.asPage .btn:hover{background:#7a1c10;border-color:#7a1c10;color:#f6ecd8}
+#options.asPage .mini{color:#3a2812;border-color:rgba(92,66,30,.55)}
+#options.asPage .mini:hover{color:#7a1c10;border-color:#7a1c10;background:rgba(122,28,16,.07)}
+
+/* ---- responsivo: livro grande em telas estreitas ---- */
+@media (max-width:860px){
+  #bookStage{width:min(560px,97vw)}
+  .candle{transform:scale(.72);opacity:.85}
+  .candle.cl{left:2%;bottom:4%}
+  .candle.cr{right:2%;bottom:6%}
+  #bkStackR{right:-5px;width:7px}
+  #bkStackB{bottom:-7px;height:7px}
+  #bookMenu .pg{min-height:min(430px,50vh)}
+}
+@media (prefers-reduced-motion:reduce){
+  #bkDim{transition:none}
+  .cglass{animation:none}
+}
+
+/* ============================================================
+   v1.9.1 — A LOUSA DOS CÍRCULOS (CARTOGRAFIA DO INFERNO)
+   O livro fecha e a lousa aparece: um esquema antigo a giz —
+   a descida em anéis sucessivos (I fora → IX no fundo), cada
+   região com número, nome e símbolo próprio, caminho pontilhado
+   entre os anéis, um abismo lacrado no centro — e a PENUMBRA
+   DAS ALMAS FORA do desenho, à direita, ligada por uma linha
+   lateral fina e descontínua. Arte estática em SVG (filtro de
+   giz rasterizado 1×): zero custo por quadro; hover troca classe;
+   o zoom de seleção é transform puro. IDs preservados: os
+   handlers do game.js seguem mandando.
+   ============================================================ */
+#circles{background:#141311}
+.lousaWrap{width:min(1120px,97vw);margin:0 auto}
+/* revelação: o livro fechou e a lousa assenta (1 animação curta,
+   transform/opacity — nada de re-layout; não repete ao voltar) */
+.lousaWrap.reveal{animation:lousaIn .55s ease-out both}
+@keyframes lousaIn{from{opacity:0;transform:scale(.962) translateY(12px)}to{opacity:1;transform:none}}
+.lousa{position:relative;background:
+    radial-gradient(120% 90% at 30% 12%,rgba(236,229,210,.05),transparent 55%),
+    radial-gradient(90% 70% at 78% 88%,rgba(236,229,210,.035),transparent 60%),
+    radial-gradient(140% 110% at 50% 50%,#2e3831 0%,#27302a 55%,#1f2621 100%);
+  border:12px solid #3a2a16;border-radius:8px;box-shadow:
+    inset 0 0 60px rgba(0,0,0,.55),
+    inset 0 0 6px rgba(0,0,0,.7),
+    0 24px 60px rgba(0,0,0,.75),
+    0 2px 0 rgba(255,220,160,.06);
+  padding:clamp(10px,2.2vw,24px) clamp(10px,2.4vw,28px) clamp(12px,2.4vw,24px);
+  font-size:clamp(8px,1.5vw,13px);
+  transition:transform .32s cubic-bezier(.5,0,.3,1);will-change:auto}
+/* zoom de seleção: aproximação curta da região escolhida; a classe
+   sai depois que a tela troca — o enquadramento geral volta sozinho */
+.lousa.zPen{transform:scale(1.22) translate(-7%,1.5%)}
+.lousa.zLim{transform:scale(1.16) translate(5%,8%)}
+.lousa.zEsc{transform:scale(1.18) translate(9%,10%)}
+.lousa::after{content:"";position:absolute;left:50%;bottom:calc(-12px - 6px);width:110px;height:7px;margin-left:-55px;border-radius:0 0 4px 4px;background:linear-gradient(#4a3618,#241708);box-shadow:0 2px 4px rgba(0,0,0,.5)}
+#circles .lu-eyebrow{color:#d98a80;text-shadow:0 0 10px rgba(217,138,128,.25)}
+.lousaTitle{font-size:clamp(19px,3vw,36px)!important;color:#ece5d2!important;text-shadow:0 0 16px rgba(236,229,210,.16),0 2px 0 rgba(0,0,0,.55)!important;margin-bottom:1px}
+.lousaSub{font-family:'IM Fell English SC',Georgia,serif;font-size:clamp(9px,1.4vw,13px);letter-spacing:.24em;color:rgba(236,229,210,.5);margin:0 0 2px}
+.lousaBoard{position:relative;width:min(960px,100%);aspect-ratio:980/640;margin:2px auto 0}
+#lousaSvg{position:absolute;inset:0;width:100%;height:100%;display:block}
+/* giz: traço claro, nomes, riscos vermelhos */
+.chRing{fill:none;stroke:rgba(236,229,210,.55);stroke-width:2}
+.chRing.hot{stroke:rgba(244,238,220,.92);stroke-width:2.6}
+.chRing.ghost{stroke:rgba(236,229,210,.24);stroke-width:1.5;stroke-dasharray:10 7}
+.chT{font-family:'IM Fell English SC',Georgia,serif;font-size:12.5px;fill:rgba(236,229,210,.85);text-anchor:middle;letter-spacing:.12em}
+.chT.far{font-size:11.5px;fill:rgba(236,229,210,.4);letter-spacing:.42em}
+.chT.hot{font-size:14px;fill:rgba(248,243,228,.98)}
+.chT.dead{fill:rgba(236,229,210,.4)}
+.chT.sm{font-size:11px}
+.chT.xs{font-size:8.5px;letter-spacing:.06em}
+.chT.px{fill:rgba(198,220,238,.8)} /* letras da penumbra: anotação à parte */
+.chX{stroke:rgba(217,120,108,.5);stroke-width:1.6;stroke-linecap:round}
+.chSym{fill:none;stroke:rgba(236,229,210,.55);stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round}
+.chSym.hot{stroke:rgba(244,238,220,.85)}
+.chPath{fill:none;stroke:rgba(244,238,220,.62);stroke-width:1.8;stroke-dasharray:6 7;stroke-linecap:round;stroke-linejoin:round}
+.chArr{fill:none;stroke:rgba(236,229,210,.55);stroke-width:1.5;stroke-linecap:round}
+.chStain{fill:rgba(4,6,5,.72)}
+/* penumbra: traço fino, apagado, frio — uma anotação à margem */
+.chP{fill:none;stroke:rgba(198,220,238,.55);stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round}
+.chP.side{stroke:rgba(198,220,238,.45);stroke-width:1.1;stroke-dasharray:2 6}
+.chP.ghost{stroke:rgba(198,220,238,.28);stroke-width:1.1;stroke-dasharray:5 9}
+.chP.glow{fill:none;stroke:rgba(214,232,246,.75);stroke-width:1.7}
+.chMist{fill:none;stroke:rgba(198,220,238,.3);stroke-width:1.2;stroke-linecap:round}
+/* cartões de giz (as portas vivas) — position por %: escalam com a lousa */
+.chalkCard{position:absolute;background:none;border:1.6px dashed rgba(236,229,210,.6);border-radius:6px;color:#ece5d2;cursor:pointer;padding:.45em .55em;text-align:center;transition:transform .16s,border-color .16s,background .16s;font-family:'IM Fell English SC',Georgia,serif}
+.chalkCard h3{font-size:1.45em;margin:.05em 0 .12em;color:#f4eedc;letter-spacing:.14em}
+.chalkCard p{font-family:'IBM Plex Mono',monospace;font-size:.8em;line-height:1.4;margin:0 0 .28em;color:rgba(236,229,210,.7)}
+.chalkCard .lvl{font-family:'IBM Plex Mono',monospace;font-size:.74em;letter-spacing:.12em;color:#cfe9ff}
+.chalkCard:hover{transform:translateY(-2px) rotate(-.5deg);border-color:rgba(248,243,228,.95);background:rgba(236,229,210,.06)}
+#circleLimbo{left:40%;top:4.5%;width:21.5%}
+#circleEscola{left:2%;top:70%;width:20.5%;transform:rotate(-2deg)}
+#circleEscola:hover{transform:rotate(-2deg) translateY(-2px)}
+#circleEscola .lvl{color:#e6dac4}
+/* a PENUMBRA — fora do anel, à direita, com identidade própria:
+   o cartão NÃO tem moldura — o arco a giz do SVG é o desenho; só o
+   brilho do nome responde ao hover (nunca um anel como os nove) */
+.chalkOut{position:absolute;left:69%;top:30%;width:24%;background:none;border:none;color:#ece5d2;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:.1em;padding:0;transition:transform .16s;font-family:'IM Fell English SC',Georgia,serif}
+.chalkOut h3{font-size:.92em;margin:0 0 .3em;color:rgba(198,220,238,.66);letter-spacing:.34em;font-weight:400}
+.chalkOut .chName{font-size:1.5em;line-height:1.14;color:#e8f1f8;letter-spacing:.12em;text-shadow:0 0 14px rgba(198,220,238,.3);transition:text-shadow .16s}
+.chalkOut .lvl{font-family:'IBM Plex Mono',monospace;font-size:.72em;letter-spacing:.1em;color:#cfe9ff;margin-top:.18em}
+.chalkOut:hover{transform:scale(1.04)}
+.chalkOut:hover .chName{text-shadow:0 0 20px rgba(220,236,248,.75),0 0 6px rgba(220,236,248,.4)}
+/* marcas de estado (reais, do save) — risco de confirmação à mão */
+.chalkOut.done::after,.chalkCard.done::after{content:"✓";position:absolute;right:.1em;top:-.4em;font-family:'IM Fell English SC',Georgia,serif;font-size:1.25em;color:rgba(255,217,160,.8);transform:rotate(-8deg);text-shadow:0 0 8px rgba(255,217,160,.3)}
+.chalkCard.done::after{right:.3em;top:.1em}
+/* escolha: pulso curto de giz realçado (uma vez, sem loop) */
+.chosen{animation:chalkChoice .5s ease-out}
+@keyframes chalkChoice{0%{border-color:#f8f3e4;box-shadow:0 0 0 0 rgba(244,238,220,.45)}100%{border-color:rgba(236,229,210,.6);box-shadow:0 0 18px 6px rgba(244,238,220,0)}}
+/* legenda manuscrita — curta, secundária */
+.lousaLegend{display:flex;gap:1.5em;justify-content:center;flex-wrap:wrap;font-family:'IM Fell English SC',Georgia,serif;font-size:clamp(8px,1.1vw,10.5px);letter-spacing:.14em;color:rgba(236,229,210,.48);margin-top:7px}
+.lousaLegend .lgX{color:rgba(217,120,108,.72)}
+.lousaLegend .lgP{color:rgba(198,220,238,.66)}
+/* espaço reservado da informação — sem layout shift ao passar o giz */
+.lousaInfo{min-height:3.3em;display:flex;align-items:center;justify-content:center;margin-top:5px;padding:.5em .9em;border:1px dashed rgba(236,229,210,.26);border-radius:6px;font-family:'IM Fell English SC',Georgia,serif;font-size:clamp(9px,1.3vw,12.5px);color:rgba(236,229,210,.75);letter-spacing:.05em;text-align:center}
+.lousaInfo .liName{color:#f4eedc;letter-spacing:.14em}
+.lousaInfo .liTag{color:rgba(198,220,238,.75)}
+.lousaNote{color:rgba(236,229,210,.6)!important;font-size:clamp(8.5px,1.2vw,11px)}
+#circles .mini{color:#ece5d2;border-color:rgba(236,229,210,.5);background:none}
+#circles .mini:hover{color:#fff;border-color:#ece5d2;background:rgba(236,229,210,.08)}
+@media (max-width:860px){
+  .lousa{border-width:8px}
+  .lousaWrap{width:100%}
+  .chalkCard{padding:.3em .35em}
+  .chalkCard p{display:none}
+  .chalkOut h3{display:none}
+  .lousaLegend{gap:.9em}
+}
+
+/* ============================================================
+   v1.9.1 — A ENTRADA (tela inicial): THOR REVENGE em cima,
+   INICIAR logo abaixo. Atmosfera do quarto do livro em CSS PURO
+   (gradientes estáticos: zero canvas, zero custo por quadro).
+   ============================================================ */
+#entry{z-index:12;background:#050303;overflow:hidden;transition:opacity .4s,visibility 0s .4s}
+.entryRoom{position:absolute;inset:0;pointer-events:none;background:
+  radial-gradient(58% 44% at 50% 34%,rgba(255,178,96,.10) 0%,rgba(160,92,40,.05) 42%,rgba(0,0,0,0) 68%),
+  radial-gradient(120% 90% at 50% 108%,rgba(58,38,20,.35) 0%,rgba(10,6,4,0) 55%),
+  radial-gradient(140% 120% at 50% 42%,rgba(0,0,0,0) 38%,rgba(2,1,1,.6) 74%,rgba(1,0,0,.92) 100%)}
+.entryRoom::before{content:"";position:absolute;left:50%;top:0;width:2px;height:38%;margin-left:-1px;
+  background:linear-gradient(rgba(255,196,120,.07),rgba(0,0,0,0));filter:none}
+.entryBox{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;margin:auto 0}
+.entrySym{font-size:clamp(20px,3vw,30px);color:#7e2634;text-shadow:0 0 18px rgba(165,42,58,.35);margin-bottom:6px}
+.entryTitle{margin:0;font-family:'Pirata One',Georgia,serif;font-weight:400;
+  font-size:clamp(52px,9.5vw,108px);line-height:1.02;color:#e6dac4;
+  text-shadow:0 0 34px rgba(255,190,110,.14),0 3px 0 rgba(0,0,0,.6),0 16px 44px rgba(0,0,0,.85);
+  letter-spacing:.02em}
+.entryTitle .etC{color:#a52a3a;padding:0 .06em}
+.entrySub{margin-top:6px;font-family:'IM Fell English SC',Georgia,serif;
+  font-size:clamp(12px,2vw,17px);letter-spacing:.5em;color:#9c8f7c;text-transform:lowercase}
+.entryBtn{margin-top:clamp(24px,4.5vh,42px);font-size:15px;padding:16px 52px 16px 58px;color:#f0e6cf;
+  border-color:#6a5a48;background:rgba(20,12,8,.35)}
+.entryBtn:hover{background:#a52a3a;border-color:#a52a3a}
+.entryBtn.go{background:#a52a3a;border-color:#a52a3a;color:#fff4e0;transform:scale(1.05);
+  box-shadow:0 0 26px rgba(165,42,58,.45)}
+.entryHint{margin-top:18px;font-family:'IBM Plex Mono',monospace;font-size:10px;
+  letter-spacing:.28em;color:#6e6357;text-transform:uppercase}
+@media (max-width:860px){
+  .entrySub{letter-spacing:.34em}
+  .entryBtn{padding:14px 38px}
+}
+
+/* ============================================================
+   v1.9.2 — A INTRODUÇÃO CINEMATOGRÁFICA (#cineCv) + a ENTRADA
+   em MODO CINE (o título revela-se sobre o quadro final, como
+   inscrição antiga) + o convite "rever a introdução".
+   Zero custo fora da cutscene: o canvas só existe durante ela.
+   ============================================================ */
+#cineCv{position:absolute;inset:0;z-index:46;pointer-events:none;opacity:0;background:#050303}
+#entry.cineMode{background:transparent}
+#entry.cineMode .entryRoom{display:none}
+#entry.cineMode .entrySym{animation:cineFade 2s .3s ease-out both}
+#entry.cineMode .entryTitle{animation:cineReveal 2.3s ease-out both}
+#entry.cineMode .entrySub{animation:cineFade 2.6s .55s ease-out both}
+#entry.cineMode .entryBtn{animation:cineFade 1.7s 1.35s ease-out both}
+#entry.cineMode .entryAgain{animation:cineFade 1.7s 2s ease-out both}
+#entry.cineMode .entryHint{animation:cineFade 1.7s 2.2s ease-out both}
+@keyframes cineReveal{
+  0%{opacity:0;letter-spacing:.3em;filter:blur(7px)}
+  55%{opacity:1;filter:blur(0)}
+  100%{opacity:1;letter-spacing:.02em}
+}
+@keyframes cineFade{from{opacity:0}to{opacity:1}}
+.entryAgain{margin-top:14px;background:none;border:none;color:#6e6154;
+  font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.16em;
+  cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px;
+  text-transform:lowercase;transition:color .25s}
+.entryAgain:hover{color:#a52a3a}
+@media (prefers-reduced-motion:reduce){
+  #entry.cineMode .entryTitle,#entry.cineMode .entrySub,#entry.cineMode .entryBtn,
+  #entry.cineMode .entryAgain,#entry.cineMode .entryHint,#entry.cineMode .entrySym{animation:none}
 }

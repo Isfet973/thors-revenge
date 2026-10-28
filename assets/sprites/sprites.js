@@ -55,6 +55,8 @@ const SLOTS={
   /* protagonista e cenário */
   thor:['thor','thor-cachorro','player','cachorro','dog'],
   fundo:['fundo','cenario','background','bg','piso','chão'],
+  /* v1.6.1: A BESTA DO ABISMO — a tela de morte (aparece quando você perde) */
+  besta:['besta','a-besta','besta-das-trevas','besta-do-abismo','fera','fera-das-trevas','beast'],
   /* chefes */
   'velho-rei':['velho-rei','velho rei','rei','rk','old-king'],
   espelho:['espelho','espelho-do-rei','reflexo','rkm','sombra-do-rei'],
@@ -558,6 +560,20 @@ window.THOR_PNG={
       c.restore();
     }catch(e){return false;}
     return true;
+  },
+  /* v1.6.1: A BESTA DO ABISMO na tela de morte — a arte do usuário substitui
+     a besta vetorial INTEIRA (chifres + cabeça + olhos + sorriso). O texto
+     de provação e a assinatura continuam desenhados pelo jogo. cx/cy é o
+     centro da cabeça vetorial; a caixa (340×400, centrada um pouco acima de
+     cy) dá espaço para artes com chifres. Sem o arquivo → false → desenho
+     original, como sempre — nada quebra, nunca fica invisível. */
+  drawBesta:function(c,cx,cy,opts){
+    const img=imgFor('besta');
+    if(!img)return false;
+    try{
+      fitDraw(c,img,cx,cy-30,340,400,(opts&&opts.alpha!==undefined)?opts.alpha:1);
+      return true;
+    }catch(e){return false;}
   },
   /* piso da sala — PNG esticado sobre o chão (paredes continuam) */
   drawFloor:function(f,ROOM,rects,inv){

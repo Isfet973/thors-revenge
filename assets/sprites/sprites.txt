@@ -5,3 +5,4 @@
 # lamentadora = minha-lamentadora.png
 # morcego = morcego-flamejante.png
 # cérbero = cerbero-arte-final.png
+# besta = minha-besta-da-morte.png   (v1.6.1 — a besta da tela de morte)

@@ -289,12 +289,6 @@ let curMode='run',curEl=null,prevEl=null;
 function slotNames(mode){
   if(mode==='menu')return['menu'];
   if(mode==='run')return['inferno','ambiente','fundo'];
-  /* v1.6.1: as faixas por área — coloque o arquivo com o nome e o jogo usa */
-  if(mode==='portao')return['portao','portão','gate'];
-  if(mode==='vulcan')return['vulcan','vulcao','vulcão','garganta'];
-  if(mode==='azul')return['azul','corredor-azul','blue-corr'];
-  if(mode==='limbo')return['limbo','o-limbo','limbo-ambiente'];
-  if(mode==='limbocinza')return['limbo-cinza','limbocinza','limbo-2'];
   if(mode==='win')return['vitoria','win'];
   if(mode==='morte')return['morte','derrota'];
   if(mode==='rk2')return['velho-rei-fase2','velho-rei-fase-2'];
@@ -443,32 +437,6 @@ function padDrone(t){
 }
 /* padrões de 16 passos dos novos temas (0 = pausa) */
 const THEME_SEQ={
-  /* v1.6.1: O TEMA DO MAPA — iniciar o jogo TROCA a música: o drone do menu
-     cala e o mapa ganha o tema próprio (a descida tem som de descida) */
-  run:{step:.34,
-    bass:[41.2,0,0,0,43.65,0,0,0,41.2,0,0,0,38.9,0,0,0],
-    arp:[329.6,0,392,0,329.6,0,293.7,0,329.6,0,392,0,440,0,392,0],
-    tick:[0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0]},
-  /* v1.6.1: FAIXAS POR ÁREA — portão, vulcão, corredor azul, limbo e o
-     limbo...? (cada zona tem o seu clima; arquivos .ogg/.mp3 com o nome do
-     slot substituem o tema sintetizado automaticamente) */
-  portao:{step:.42,
-    bass:[36.7,0,0,0,0,0,34.6,0,0,0,0,0,32.7,0,0,0],
-    sub:[73.4,0,0,0,0,0,69.3,0,0,0,0,0,65.4,0,0,0],
-    tick:[1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0]},
-  vulcan:{step:.24,
-    bass:[49,0,49,0,46.2,0,49,0,49,0,49,0,51.9,0,46.2,0],
-    sub:[98,0,0,0,92.5,0,0,0,98,0,0,0,103.8,0,0,0],
-    tick:[1,0,1,0,1,0,1,1,1,0,1,0,1,1,1,1]},
-  azul:{step:.5,
-    arp:[261.6,0,0,0,311.1,0,0,0,349.2,0,0,0,311.1,0,0,0],
-    bass:[65.4,0,0,0,0,0,0,0,58.3,0,0,0,0,0,0,0]},
-  limbo:{step:.46,
-    arp:[440,0,0,0,523.25,0,0,0,587.33,0,0,0,523.25,0,0,0],
-    bass:[110,0,0,0,0,0,0,0,98,0,0,0,0,0,0,0]},
-  limbocinza:{step:.62,
-    arp:[440,0,0,0,0,0,415.3,0,0,0,0,0,0,0,0,0],
-    bass:[55,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]},
   /* chefes em geral — marcha tensa */
   boss:{step:.30,
     bass:[55,0,55,0,65.41,0,49,0,55,0,55,0,73.42,0,65.41,0],
@@ -628,7 +596,7 @@ function musicTick(){
   musicStep++;
 }
 /* procura antecipada dos slots fixos assim que a página carrega */
-['menu','run','boss','boss:rk','rk2','win','morte','escola','escola:cacada','escola:espelho','escola:ritual','escola:inundacao','castelo','castelo:luta','castelo:sacada','castelo:boss','cerberus','sentenca0','portao','vulcan','azul','limbo','limbocinza'].forEach(function(m){resolveSlot(m);}); /* v1.5.7: os dois temas do Cérbero entram na procura cedo · v1.6.1: as faixas por área também */
+['menu','run','boss','boss:rk','rk2','win','morte','escola','escola:cacada','escola:espelho','escola:ritual','escola:inundacao','castelo','castelo:luta','castelo:sacada','castelo:boss','cerberus','sentenca0'].forEach(function(m){resolveSlot(m);}); /* v1.5.7: os dois temas do Cérbero entram na procura cedo */
 
 /* diagnóstico no console: window.__AUDIO_DEBUG() */
 window.__AUDIO_DEBUG=function(){

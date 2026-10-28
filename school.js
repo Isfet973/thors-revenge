@@ -1234,7 +1234,7 @@ function updateHunter(dt){
   const bmul=h.burst>0?1.32:1;
   const inv=SCHOOL.area.indexOf('inv_')===0;
   const detect=(inv?540:430)+mad*14;
-  const chaseSpd=(inv?354:338)+Math.min(32,mad*4);
+  const chaseSpd=(inv?268:255)+Math.min(22,mad*3); /* v1.9.0: um pouco mais lenta que Thor (285) — o terror agora vem da caça, não da velocidade bruta */
   if(h.lure){h.lure.t-=dt;if(h.lure.t<=0)h.lure=null;}
   /* aparição scripted (fim de corredor, reflexo, "já estava lá") */
   if(h.obs){

@@ -68,6 +68,19 @@ DETECÇÃO AUTOMÁTICA (v4):
                            cobrir a sala (recortada no formato dela);
                            paredes, bordas e brasas continuam por cima.
 
+=== A TELA DE MORTE (v1.6.1) — A BESTA DO ABISMO ===
+  besta.png              — A BESTA que aparece quando você perde. A SUA arte
+                           substitui a besta vetorial INTEIRA (chifres,
+                           cabeça, olhos em brasa e sorriso) — o texto de
+                           provação e a assinatura "— A BESTA DO ABISMO —"
+                           continuam desenhados pelo jogo. Arte com fundo
+                           transparente cai melhor (o fundo escuro segue).
+                           Tamanho livre — a caixa é ~340×400.
+                           Outros nomes que valem: besta-das-trevas.png,
+                           besta-do-abismo.png, a-besta.png, fera.png,
+                           fera-das-trevas.png, beast.png
+  Sem o arquivo, a besta vetorial de sempre aparece — nada quebra.
+
 === ESCOLA (4ª descida "???") ===
   Os sprites da escola ficam na subpasta assets/sprites/escola/
   (cacador.png, cacador-cabeca.png, fragmento.png, espelho.png) —

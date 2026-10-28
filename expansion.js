@@ -371,9 +371,9 @@ const X_WEAPONS={
   ultimopec:{name:'PISTOLAS DO ÚLTIMO PECADO',cd:.26,
     hint:'disparo alternado — o ritmo perfeito acelera a ira'},
   credor:{name:'O CREDOR',cd:1.5,
-    hint:'chicote no mouse: esquerdo puxa o marcado (sem ninguém, estala em área) · direito amarra inimigos, objetos e PAREDES — balance e solte para arremessar'},
+    hint:'chicote — esquerdo puxa o marcado · direito amarra e arremessa (até paredes)'},
   colher:{name:'COLHER COMICAMENTE GRANDE',cd:.5,
-    hint:'arma de corpo a corpo: arremessa demônios e absorve efeitos elementais — fogo queima, explosões detonam e gelo congela. segure o botão para carregar uma colherada devastadora. inimigos grandes voam menos. a cada 13 colheradas, o céu responde'},
+    hint:'é uma colher. comicamente grande.'}, /* v1.6.3: sem sermão — o nome já diz tudo */
   peixe:{name:'PEIXE DE GUERRA',cd:.72,
     hint:'arremesso com quiques exagerados — quica, respinga e afoga'},
   teclado:{name:'TECLADO DO PECADOR',cd:.2,
@@ -1189,9 +1189,7 @@ function zoneOf(){
   if(r==='limbo'){
     const p=game.limboPhase||1;
     if(p<=2)return{z:'limbo',ph:p,name:'O LIMBO — FASE '+p};
-    /* v1.6.1: depois de duas fases o limbo ESVAZIA — o nome é só "o limbo...?",
-       tudo cinza, menos inimigos, como se alguém já tivesse passado */
-    return{z:'limbocinza',ph:p-2,name:'o limbo...?'};
+    return{z:'limbinf',ph:p-2,name:'O LIMBO INFERNAL — FASE '+(p-2)};
   }
   /* penumbra: andares 1-4 */
   const f=game.floor;
@@ -1210,12 +1208,8 @@ function zoneLabel(){
     limbo1:'o falso paraíso — almas que não avançam nem desaparecem',
     limbo2:'as cores foram embora. restou a saudade',
     limbinf1:'o paraíso esquenta — as almas ganharam garras',
-    limbinf2:'o último véu antes do fim da descida',
-    limbocinza1:'está tudo cinza — como se alguém já tivesse passado',
-    limbocinza2:'a grama não é verde. o céu não é céu. sobrou o quê?'
+    limbinf2:'o último véu antes do fim da descida'
   };
-  /* v1.6.1: o limbo...? não tem "FASE" no nome — o nome é só o nome */
-  if(zn.z==='limbocinza')return{label:'o limbo...?',sub:subs[zn.z+zn.ph]||''};
   return{label:(zn.z==='vulcan'?'GARGANTA · FASE ':zn.z==='limbinf'?'LIMBO INFERNAL · FASE ':zn.z==='limbo'?'LIMBO · FASE ':zn.z==='peninf'?'PENUMBRA INFERNAL · FASE ':'PENUMBRA · FASE ')+roman(zn.ph),
          sub:subs[zn.z+zn.ph]||''};
 }
@@ -1232,12 +1226,6 @@ function updateMusicZone(){
   if(st==='cerbintro'){window.__MUSIC_ZONE=CI.snap?'cerberus':null;return;}
   if(st==='bluecorr'){window.__MUSIC_ZONE='azul';return;}
   if(st==='play'&&game.region==='vulcan'){window.__MUSIC_ZONE='vulcan';return;}
-  /* v1.6.1: o LIMBO tem faixa própria — e depois de duas fases, o limbo...?
-     tem a sua (vazia, cinza). O JUIZ (se um dia invocado) mantém a dele. */
-  if(st==='play'&&game.region==='limbo'&&!game._cerbFight){
-    let juiz=false;for(const e of enemies){if(e&&!e.dead&&e.type==='juiz'){juiz=true;break;}}
-    if(!juiz){window.__MUSIC_ZONE=(game.limboPhase||1)>=3?'limbocinza':'limbo';return;}
-  }
   window.__MUSIC_ZONE=null;
 }
 
@@ -1707,8 +1695,13 @@ function updateCerbIntro(dt){
     player.y=Math.max(H*.74,player.y-140*dt);
     player.mvx=0;player.mvy=-1;player.walkT+=dt*7;player.angle=-Math.PI/2;
   }else{player.mvx=0;player.mvy=0;}
-  /* v1.6.0: O PORTÃO NÃO FECHA MAIS — Thor entrou e o vão continua aberto
-     atrás dele (sem estrondo, sem tremer, sem o aviso "não há mais volta") */
+  /* o portão se FECHA atrás de Thor — não tem mais volta */
+  if(!CI.slam&&t>3.0){
+    CI.slam=true;CI._snapAt=t;
+    try{sfx.gate();sfx.rumble();}catch(e){}
+    game.shake=Math.max(game.shake,10);
+    texts.push({x:W/2,y:H*.15,txt:'o portão se fechou. não há mais volta.',t:0,life:2.6,c:'#6e6357',size:11,disp:true});
+  }
   /* v1.5.7: ACORDAR BEM LENTO — o sprite antigo dorme e cada cabeça ergue no
      SEU tempo (h.wake abre os olhos devagar no drawHead; as poses são as
      mesmas fórmulas do intro clássico, agora com o relógio da cena) */
@@ -1772,10 +1765,30 @@ function drawCerbIntro(){
      escura) */
   if(roomFloor)ctx.drawImage(roomFloor,ROOM.x,ROOM.y);
   else{ctx.fillStyle='#050307';ctx.fillRect(0,0,W,H);}
-  /* v1.6.1: a porta que ficava ATRÁS do Thor dentro da arena saiu POR
-     COMPLETO — nada de portão desenhado, nada de fechamento, nada de coluna
-     de luz. O Thor entra e a arena é só arena. O portão de VERDADE (o que se
-     abre com [Z] no caminho do portão) continua intacto lá em cima. */
+  /* v1.5.7: o PORTÃO ENORME fica POR BAIXO (no chão da arena) — abre devagar
+     e se fecha de vez após o Thor sair; luz branca no miolo, âmbar ao redor */
+  let open=clamp((t-.6)/2.2,0,1);
+  if(CI.slam)open=Math.max(0,open-(t-CI._snapAt-1.2)*1.8);
+  const gx=W*.5,gy=H-10,gw=190,gh=300;
+  if(open>0){
+    const gr=ctx.createRadialGradient(gx,gy,4,gx,gy,gw*1.1);
+    gr.addColorStop(0,'rgba(255,255,255,'+(.7*open)+')');
+    gr.addColorStop(.4,'rgba(255,190,90,'+(.34*open)+')');
+    gr.addColorStop(1,'rgba(255,120,40,0)');
+    ctx.fillStyle=gr;ctx.fillRect(gx-gw*1.2,gy-gh*2,gw*2.4,gh*2);
+    /* o interior revelado é TOTALMENTE BRANCO — uma coluna de luz do chão */
+    const rw=gw*open;
+    ctx.fillStyle='rgba(255,252,244,'+(.9*open)+')';ctx.fillRect(gx-rw/2,gy-gh,rw,gh);
+  }
+  const lw=(gw/2)*(1-open);
+  /* folhas ancoradas pela borda EXTERNA — recuam para FORA ao abrir */
+  ctx.fillStyle='#241a30';
+  ctx.fillRect(gx-gw/2-6,gy-gh,lw+6,gh); /* esquerda: borda externa fixa */
+  ctx.fillRect(gx+gw/2-lw,gy-gh,lw+6,gh); /* direita: borda externa fixa */
+  ctx.strokeStyle='#4a3a5a';ctx.lineWidth=4;
+  ctx.strokeRect(gx-gw/2-6,gy-gh,lw+6,gh);ctx.strokeRect(gx+gw/2-lw,gy-gh,lw+6,gh);
+  ctx.fillStyle='#6e6357';ctx.font='13px IBM Plex Mono';ctx.textAlign='center';
+  ctx.fillText('✕ ◈ ✕',gx,gy-gh+34);
   /* v1.5.6: O CÉRBERO ANTIGO DE VERDADE — o sprite real do boss (corpo,
      pernas, cauda, pescoços e as três cabeças do drawHead) DORMINDO:
      wake=0 mantém os olhos FECHADOS e as cabeças recolhidas; conforme o
@@ -1997,10 +2010,6 @@ function startBlueCorr(){
   game.state='bluecorr';
   game._bcActive=true; /* o recusa de Caronte volta para cá */
   game._arenaLock=false; /* v1.5.4: saiu da arena do Cérbero — escadas voltam a existir */
-  /* v1.6.0: A BARRA DO CÉRBERO NÃO ATRAVESSA — o remake devolvia boss.active=true
-     com barT=1 para a cena final e nada desligava no caminho da Segunda Descida:
-     a barra aparecia de novo no LIMBO. Saiu da arena, a barra morre aqui. */
-  boss.active=false;boss.barT=0;boss.frenzyActive=false;
   game.playerAlpha=1; /* v1.4.3: Thor visível no corredor (defesa em profundidade) */
   BC.t=0;BC.phase='walk';BC.fog=0;
   ROOM.x=0;ROOM.y=0;ROOM.w=W;ROOM.h=H;ROOM.inverted=false;
@@ -2113,7 +2122,8 @@ function setupXBoss(e,type){
 /* fábrica — substitui o spawnEnemy para os tipos novos (envolve o original).
    spawnEnemy NÃO retorna o inimigo (só pusha) — pegamos o último do array. */
 const _origSpawnEnemy=spawnEnemy;
-spawnEnemy=function(type,x,y,kaizo){
+/* v1.6.4: repassa o hpMul (A CORTE DUPLA — o gêmeo nasce com 80% da vida) */
+spawnEnemy=function(type,x,y,kaizo,hpMul){
   if(XBOSS_TYPES.indexOf(type)>=0){
     try{if(!META.seen[type]){META.seen[type]=1;saveMeta();}}catch(e){}
     const before=enemies.length;
@@ -2122,7 +2132,7 @@ spawnEnemy=function(type,x,y,kaizo){
     if(!e)return null;
     return setupXBoss(e,type);
   }
-  return _origSpawnEnemy(type,x,y,kaizo);
+  return _origSpawnEnemy(type,x,y,kaizo,hpMul);
 };
 /* ---- IA compartilhada ---- */
 function xbossAI(e,dt,a,d,slowMul){
@@ -2935,10 +2945,10 @@ function frameSyn(dt){
       }
     }
   }
-  /* ---- PACTOS: preços cobrados no relógio ---- */
+  /* ---- PACTOS: preços cobrados no relógio — v1.9.0: NENHUM tira vida mais ---- */
   if(game.pacAco){
     _acoT+=dt;
-    if(_acoT>=8){_acoT=0;player.hp=Math.max(1,player.hp-3);x_sparks(player.x,player.y,'#d9465a',5,140,.4,2.5);x_txt('O AÇOUGUEIRO COBRA -3',player.x,player.y-38,9,'#d9465a');}
+    if(_acoT>=8){_acoT=0;const _cob=Math.min(4,META.souls|0);if(_cob>0){META.souls-=_cob;}x_txt('O AÇOUGUEIRO COBRA -'+_cob+' almas',player.x,player.y-38,9,'#d9465a');}
   }
   if(game.pacHora){
     _horaT+=dt;
@@ -2949,7 +2959,7 @@ function frameSyn(dt){
   }
   if(game.pacFalsoRei){
     _falsoT+=dt;
-    if(_falsoT>=10){_falsoT=0;player.hp=Math.max(1,player.hp-2);}
+    if(_falsoT>=10){_falsoT=0;const _cob=Math.min(3,META.souls|0);if(_cob>0){META.souls-=_cob;x_txt('O FALSO REI COBRA -'+_cob+' almas',player.x,player.y-38,9,'#9d6bb5');}}
   }
   if(game.pacDev){
     _devGlT+=dt;
@@ -3048,14 +3058,15 @@ function onKill(e){
 /* início do andar — juros e dívidas (via onEnterRoom sala 0) */
 function floorStartFx(){
   try{
-    if(game.pacDivida&&player.hp>10){
-      const j=Math.ceil(player.hp*.10);
-      player.hp-=j;
-      texts.push({x:player.x,y:player.y-40,txt:'JUROS DA DÍVIDA -'+j,t:0,life:1.6,c:'#9d6bb5',size:12,disp:true});
+    if(game.pacDivida&&game.floor>1){
+      /* v1.9.0: os juros caem sobre as ALMAS, nunca sobre a vida */
+      const j=Math.min(40,Math.ceil((META.souls|0)*.15));
+      if(j>0){META.souls-=j;texts.push({x:player.x,y:player.y-40,txt:'JUROS DA DÍVIDA -'+j+' almas',t:0,life:1.6,c:'#9d6bb5',size:12,disp:true});}
     }
     if(game.mods&&game.mods.dividasangue&&game.floor>1){
-      player.hp=Math.max(1,player.hp-5);
-      texts.push({x:player.x,y:player.y-58,txt:'DÍVIDA DE SANGUE -5',t:0,life:1.6,c:'#d9465a',size:11,disp:true});
+      const _ds=Math.min(10,META.souls|0);
+      if(_ds>0){META.souls-=_ds;}
+      texts.push({x:player.x,y:player.y-58,txt:'DÍVIDA DE SANGUE -'+_ds+' almas',t:0,life:1.6,c:'#d9465a',size:11,disp:true});
     }
     game._penaUsedFloor=false;
   }catch(e){}
@@ -3377,8 +3388,10 @@ gainSouls=function(n){
       game.barqK=(game.barqK||0)+n;
       if(game.barqK>=60){
         game.barqK-=60;
-        player.hp=Math.max(1,player.hp-5);
-        x_txt('O PEDÁGIO: -5',player.x,player.y-40,10,'#7fb8ff');
+        /* v1.9.0: o pedágio agora é em almas — nunca em vida */
+        const _ped=Math.min(15,n);
+        if(_ped>0)META.souls=Math.max(0,(META.souls|0)-_ped);
+        x_txt('O PEDÁGIO: -'+_ped+' almas',player.x,player.y-40,10,'#7fb8ff');
         try{noiseSfx(.3,.05,200,'lowpass');}catch(e){}
       }
     }
@@ -3510,408 +3523,6 @@ function serpInteract(){
     }
   }catch(e){}
 }
-/* ================================================================
-   v1.6.1→v1.6.3 — A SALA DO PRIMEIRO PECADO (SÓ A PLACA)
-   Depois de duas fases, o limbo esvazia ("o limbo...?") e a sala do
-   chefe tem uma placa. Lida a placa ([Z]), sair da leitura ([Z]) abre
-   DIRETO o buraco com aura rosa ("luxuria") — entrar nele mostra o
-   fim dos círculos: modo infinito ou menu.
-   v1.6.3: a GANANCIA NÃO materializa (pedido do usuário — SÓ a placa;
-   os sprites e os diálogos dele ainda serão feitos pelo usuário). A
-   luta inteira da v1.6.2 segue DORMANTE aqui no código atrás da flag
-   GANANCIA_LUTA (linha a seguir) — quando a arte e as falas checarem,
-   basta ligá-la e o boss materializa de novo, com os 4 padrões e o
-   roubo no final. O JUIZ segue INTACTO no código (o laboratório
-   continua podendo invocá-lo).
-   ================================================================ */
-let PLACA=null;
-/* v1.6.3: a LUTA da ganancia está DORMANTE — o usuário ainda fará os
-   sprites e os diálogos do boss; por agora a sala tem SÓ a placa e o
-   buraco da luxuria abre direto. GANANCIA_LUTA=true materializa ele
-   de novo (a luta completa da v1.6.2 continua aqui, intocada). */
-const GANANCIA_LUTA=false;
-let GN=null; /* v1.6.2: a GANANCIA em pessoa (dormante na v1.6.3) */
-const PLACA_TXT='aqui teria o primeiro pecado: ganancia, por preguiça e ainda uma junção de ideias, apenas tera isso, mas imagine uma luta fofda e ele no final rouba tudo seu';
-const PLACA_LINHAS=[
-  'aqui teria o primeiro pecado: ganancia,',
-  'por preguiça e ainda uma junção de ideias,',
-  'apenas tera isso, mas imagine uma luta fofda',
-  'e ele no final rouba tudo seu'
-];
-function beginGananciaPlaca(){
-  PLACA={ph:0,t:0,readT:0,hT:0};
-  game.state='play';
-  game.banner=null;game.headBanner=null;
-  try{window.__MUSIC_ZONE='limbocinza';}catch(e){}
-  texts.push({x:W/2,y:H*.26,txt:'A SALA DO PRIMEIRO PECADO',t:0,life:2.4,c:'#ffd9a0',size:14,disp:true});
-  texts.push({x:W/2,y:H*.30,txt:'não tem ninguém. tem uma placa.',t:0,life:2.4,c:'#9c8f7c',size:10,disp:true});
-  try{sfx.echo();blip('sine',180,90,.6,.09);}catch(e){}
-}
-function placaPos(){return{x:W*.5,y:ROOM.y+ROOM.h*.36};}
-/* [Z] na placa: lê; [Z] de novo: sai da leitura e o buraco abre */
-function placaInteract(){
-  if(!PLACA||PLACA.ph>=2)return false;
-  const p=placaPos();
-  if(dist(player.x,player.y,p.x,p.y)>130)return false;
-  if(PLACA.ph===0){
-    PLACA.ph=1;PLACA.readT=0;
-    try{blip('square',220,140,.3,.08);blip('sine',440,330,.4,.05);}catch(e){}
-    return true;
-  }
-  if(PLACA.ph===1){
-    if(GANANCIA_LUTA){
-      /* DORMANTE (v1.6.2): sair da leitura → A GANANCIA MATERIALIZA (o boss
-         do "limbo?" 2 é ele — o que a placa anunciava deixa de ser piada).
-         Reativa quando os sprites e os diálogos do usuário chegarem. */
-      PLACA.ph=2;
-      game.shake=Math.max(game.shake,12);
-      try{blip('sine',300,70,.7,.11);noiseSfx(.7,.07,90,'lowpass');blip('square',1250,780,.5,.07);}catch(e){}
-      texts.push({x:p.x,y:p.y-224,txt:'algo DOURADO responde à leitura',t:0,life:2.4,c:'#ffd9a0',size:11,disp:true});
-      beginGanancia();
-      return true;
-    }
-    /* v1.6.3: SÓ A PLACA — sair da leitura abre DIRETO o buraco da luxuria;
-       ninguém materializa. A luta dorminte espera os sprites e diálogos. */
-    PLACA.ph=3;PLACA.hT=0;
-    game.shake=Math.max(game.shake,6);
-    try{blip('sine',300,70,.5,.09);sfx.echo();}catch(e){}
-    texts.push({x:p.x,y:p.y-224,txt:'o chão se abre — luxuria',t:0,life:2.2,c:'#ff6ad5',size:11,disp:true});
-    return true;
-  }
-  return false;
-}
-/* ---- v1.6.2: A GANANCIA — o primeiro pecado, em pessoa ---- */
-function beginGanancia(){
-  const hp=Math.round(1500+(game.threat||0)*40);
-  GN={ph:'rise',t:0,hp:hp,maxHp:hp,x:W*.5,y:ROOM.y+ROOM.h*.26,stT:0,pat:null,patT:0,lastPat:null,cd:.8,seed:rnd(TAU),data:{},flash:0,riseK:0,drawK:1,stolen:0,drainAcc:0,stealT:0};
-  game.banner={type:'boss',txt:'GANANCIA',sub:'o primeiro pecado — ele quer TUDO que é seu',t:0,dur:2.8};
-  try{sfx.roar();sfx.echo();game.shake=14;game.flash=.3;}catch(e){}
-  for(let i=0;i<44;i++)particles.push({x:GN.x+rnd(-60,60),y:GN.y+rnd(-20,60),vx:rnd(-120,120),vy:rnd(-260,-40),life:rnd(.6,1.4),t:0,r:rnd(1.5,4),c:pick(['#ffd9a0','#ffbe5a','#ffedc2']),drag:.96,glow:true});
-  try{window.__MUSIC_ZONE='boss';}catch(e){}
-  texts.push({x:GN.x,y:GN.y-130,txt:'você leu. ele ouviu.',t:0,life:2.2,c:'#ffd9a0',size:11,disp:true});
-}
-function gananciaAlive(){return !!GN&&GN.ph!=='gone';}
-function gnStart(g){
-  g.data={arm:.45};
-  const pats=['moedas','maos','dizimo','avareza'];
-  let id=pick(pats);
-  if(id===g.lastPat)id=pick(pats);
-  g.lastPat=id;g.pat=id;g.patT=0;
-  try{blip('square',520,240,.12,.08);}catch(e){}
-}
-function gnHitScan(){
-  const g=GN;if(!g||g.ph!=='fight')return;
-  for(let i=bullets.length-1;i>=0;i--){
-    const b=bullets[i];
-    if(b.mine)continue;
-    if(dist(b.x,b.y,g.x,g.y)<46+b.r){
-      const d=b.dmg||1;
-      g.hp-=d;g.flash=.15;
-      sparks(b.x,b.y,'#ffd9a0',3,150,.3,2,true);
-      try{blip('square',700+irnd(0,300),420,.05,.05);}catch(e){}
-      bullets.splice(i,1);
-    }
-  }
-  if(g.hp<=0){
-    g.hp=0;g.ph='steal';g.stealT=0;g.pat=null;g.data={};
-    /* a luta cessa — ele vence de outro jeito: ROUBANDO */
-    ebullets.length=0;
-    game.shake=16;game.flash=.4;
-    try{sfx.roar();blip('sine',220,60,1.2,.14);noiseSfx(1.2,.09,90,'lowpass');}catch(e){}
-    texts.push({x:g.x,y:g.y-120,txt:'BASTA — agora é minha vez',t:0,life:2.4,c:'#ffd9a0',size:13,disp:true});
-    texts.push({x:g.x,y:g.y-96,txt:'ele estende as mãos…',t:0,life:2.4,c:'#9c8f7c',size:10,disp:true});
-  }
-}
-function frameGanancia(dt){
-  const g=GN;if(!g)return;
-  g.t+=dt;
-  if(g.flash>0)g.flash=Math.max(0,g.flash-dt*4);
-  /* ---------- NASCIMENTO ---------- */
-  if(g.ph==='rise'){
-    g.riseK=clamp(g.t/2.2,0,1);
-    if(Math.random()<.7)particles.push({x:g.x+rnd(-50,50),y:g.y+40-rnd(0,10)*g.riseK,vx:rnd(-30,30),vy:rnd(-90,-30),life:rnd(.4,.9),t:0,r:rnd(1,3),c:pick(['#ffd9a0','#ffbe5a']),drag:.97,glow:true});
-    if(g.t>=2.2){g.ph='fight';g.t=0;gnStart(g);}
-    return;
-  }
-  /* ---------- O ROUBO FINAL ---------- */
-  if(g.ph==='steal'){
-    g.stealT+=dt;
-    for(let k=0;k<3;k++){
-      const a=rnd(TAU),d=rnd(10,60);
-      particles.push({x:player.x+Math.cos(a)*d,y:player.y+Math.sin(a)*d,vx:(g.x-player.x)*.9+rnd(-30,30),vy:(g.y-player.y)*.9+rnd(-30,30),life:.5,t:0,r:rnd(1.4,3),c:pick(['#ffd9a0','#ffbe5a']),drag:.94,glow:true});
-    }
-    g.drainAcc+=dt;
-    if(g.drainAcc>.18){
-      g.drainAcc=0;
-      /* "ele no final rouba tudo seu" — almas, o que caiu no chão e metade da vida.
-         v1.6.2 FIX: o dreno das almas é PROPORCIONAL ao tempo que resta no roubo —
-         o corte ceil(souls/10) era assintótico e sobravam almas na mesa. */
-      if(game.souls>0){
-        const ticksLeft=Math.max(1,Math.ceil((3.4-g.stealT)/.18));
-        const s=Math.max(1,Math.ceil(game.souls/ticksLeft));
-        game.souls=Math.max(0,game.souls-s);g.stolen+=s;
-        try{blip('square',900+irnd(0,400),1400,.06,.05);}catch(e){}
-      }
-      if(pickups.length){g.stolen+=pickups.length;pickups.length=0;}
-      if(player.hp>Math.max(1,Math.round(player.maxHp*.5))){
-        player.hp=Math.max(Math.max(1,Math.round(player.maxHp*.5)),player.hp-6);
-        game.shake=Math.max(game.shake,4);
-        try{blip('square',300,120,.08,.06);}catch(e){}
-      }
-    }
-    if(g.stealT>=3.4){
-      g.ph='gone';
-      try{window.__MUSIC_ZONE='limbocinza';}catch(e){}
-      texts.push({x:g.x,y:g.y-90,txt:'ganancia roubou TUDO — almas: '+g.stolen,t:0,life:3,c:'#ffd9a0',size:12,disp:true});
-      texts.push({x:g.x,y:g.y-64,txt:'ele ri e some no ouro',t:0,life:3,c:'#9c8f7c',size:10,disp:true});
-      try{noiseSfx(1,.08,120,'lowpass');sfx.echo();}catch(e){}
-      /* a GANANCIA foi embora — o buraco da luxuria se abre agora */
-      PLACA.ph=3;PLACA.hT=0;
-      texts.push({x:placaPos().x,y:placaPos().y-224,txt:'o chão se abre — luxuria',t:0,life:2.2,c:'#ff6ad5',size:11,disp:true});
-    }
-    return;
-  }
-  if(g.ph!=='fight')return;
-  /* ---------- A LUTA (frenética como o modo kaizo pede) ---------- */
-  gnHitScan();
-  g.patT+=dt;
-  if(!g.pat){g.cd-=dt;if(g.cd<=0)gnStart(g);}
-  const P=g.data;
-  if(g.pat==='moedas'){
-    P.arm-=dt;
-    if(P.arm<=0&&!P.s1){P.s1=1;
-      const n=22,gap=irnd(0,n-1);
-      for(let i=0;i<n;i++){if(i===gap||i===(gap+1)%n)continue;const a=i/n*TAU+g.seed;if(ebullets.length<400)ebullets.push({x:g.x,y:g.y,vx:Math.cos(a)*165,vy:Math.sin(a)*165,r:6,c:'#ffd35a'});}
-      try{sfx.spit();}catch(e){}
-    }
-    if(P.s1&&!P.s2&&g.patT>1.0){P.s2=1;
-      const base=Math.atan2(player.y-g.y,player.x-g.x);
-      for(let i=0;i<5;i++){const a=base+(i-2)*.16;if(ebullets.length<400)ebullets.push({x:g.x,y:g.y,vx:Math.cos(a)*260,vy:Math.sin(a)*260,r:5,c:'#ffbe5a'});}
-      try{sfx.spit();}catch(e){}
-    }
-    if(P.s2&&!P.s3&&g.patT>1.6){P.s3=1;
-      const n=16,gap=irnd(0,n-1);
-      for(let i=0;i<n;i++){if(i===gap)continue;const a=i/n*TAU+.4+g.seed;if(ebullets.length<400)ebullets.push({x:g.x,y:g.y,vx:Math.cos(a)*200,vy:Math.sin(a)*200,r:6,c:'#ffd35a'});}
-      try{sfx.spit();}catch(e){}
-      game.shake=Math.max(game.shake,5);
-    }
-    if(g.patT>2.3){g.pat=null;g.cd=.85;}
-  }else if(g.pat==='maos'){
-    P.arm-=dt;
-    if(P.arm<=0&&!P.f){P.f=1;
-      const n=(game.threat||0)>=3?5:4;
-      for(let k=0;k<n;k++){
-        const a=rnd(TAU),d=rnd(60,170);
-        const rx=clamp(player.x+Math.cos(a)*d,ROOM.x+40,ROOM.x+ROOM.w-40);
-        const ry=clamp(player.y+Math.sin(a)*d,ROOM.y+40,ROOM.y+ROOM.h-40);
-        kzWarn(rx,ry,58,.9,function(){
-          kzDetonate(rx,ry,58,24,'#ffd35a');
-          for(let q=0;q<5;q++){const ba=q/5*TAU+rnd(.4);if(ebullets.length<400)ebullets.push({x:rx,y:ry,vx:Math.cos(ba)*180,vy:Math.sin(ba)*180,r:5,c:'#ffbe5a'});}
-        },'#ffd35a');
-      }
-      try{sfx.growl();}catch(e){}
-    }
-    if(P.f&&g.patT>1.9){g.pat=null;g.cd=.8;}
-  }else if(g.pat==='dizimo'){
-    P.arm-=dt;
-    if(P.arm<=0&&!P.f){P.f=1;
-      /* o DÍZIMO — cortina de moedas do topo com uma brecha que anda */
-      const n=13,gap=irnd(1,n-2);
-      for(let k=0;k<n;k++){
-        if(k===gap||k===gap+1)continue;
-        const fx=ROOM.x+30+k*(ROOM.w-60)/(n-1);
-        if(ebullets.length<400)ebullets.push({x:fx,y:ROOM.y-20,vx:0,vy:170,r:6,c:'#ffd35a',life:6});
-      }
-      for(let k=0;k<4;k++){const a=rnd(TAU);if(ebullets.length<400)ebullets.push({x:g.x,y:g.y,vx:Math.cos(a)*120,vy:Math.sin(a)*120,r:5,c:'#ffedc2',home:.8,homeT:1.6,life:3.6});}
-      try{sfx.howl();}catch(e){}
-    }
-    if(P.f&&g.patT>1.7){g.pat=null;g.cd=.8;}
-  }else if(g.pat==='avareza'){
-    /* a AVAREZA — um fio de ouro prende o Thor e o ARRASTA enquanto espirala */
-    P.arm-=dt;
-    if(P.arm<=0){
-      P.on=1;
-      const a=Math.atan2(g.y-player.y,g.x-player.x);
-      player.x+=Math.cos(a)*95*dt;player.y+=Math.sin(a)*95*dt;
-      if(ebullets.length<400&&Math.random()<dt*26){
-        const sa=rnd(TAU);
-        ebullets.push({x:g.x+Math.cos(sa)*20,y:g.y+Math.sin(sa)*20,vx:Math.cos(sa)*150,vy:Math.sin(sa)*150,r:5,c:'#ffbe5a'});
-      }
-      if(Math.random()<dt*20)particles.push({x:player.x,y:player.y,vx:(g.x-player.x)*.8,vy:(g.y-player.y)*.8,life:.35,t:0,r:rnd(1,2.4),c:'#ffd9a0',drag:.95,glow:true});
-    }
-    if(g.patT>2.2){g.pat=null;g.cd=.75;P.on=0;}
-  }
-  /* contato machuca */
-  if(!player.dead&&dist(player.x,player.y,g.x,g.y)<46+(player.hitR||player.r)-4)hurtPlayer();
-  /* o Thor não sai da sala durante a luta — as paredes viram ouro */
-  player.x=clamp(player.x,ROOM.x+16,ROOM.x+ROOM.w-16);
-  player.y=clamp(player.y,ROOM.y+16,ROOM.y+ROOM.h-16);
-}
-function drawGanancia(){
-  const g=GN;if(!g||g.ph==='gone')return;
-  const k=g.ph==='rise'?g.riseK:(g.ph==='steal'?Math.max(0,1-g.stealT/3.4):1);
-  ctx.save();
-  ctx.globalAlpha=clamp(k,0,1);
-  const pul=.5+.5*Math.sin(game.t*2.6);
-  const ag=ctx.createRadialGradient(g.x,g.y,6,g.x,g.y,120+pul*26);
-  ag.addColorStop(0,'rgba(255,215,140,'+(.4*k)+')');
-  ag.addColorStop(.55,'rgba(255,180,80,'+(.16*k)+')');
-  ag.addColorStop(1,'rgba(255,150,40,0)');
-  ctx.fillStyle=ag;ctx.fillRect(g.x-150,g.y-150,300,300);
-  ctx.translate(g.x,g.y);
-  const wob=Math.sin(game.t*2.2)*.06;
-  ctx.rotate(Math.sin(game.t*.9)*.12);
-  ctx.scale(Math.max(.01,k)*(1+wob),Math.max(.01,k)*(1-wob));
-  ctx.fillStyle='#c98f2a';ctx.strokeStyle='#57431a';ctx.lineWidth=3;
-  ctx.beginPath();ctx.arc(0,0,44,0,TAU);ctx.fill();ctx.stroke();
-  ctx.fillStyle=g.flash>0?'#fff6df':'#ffd35a';
-  ctx.beginPath();ctx.arc(0,0,38,0,TAU);ctx.fill();
-  ctx.strokeStyle='#a8761f';ctx.lineWidth=2;
-  ctx.beginPath();ctx.arc(0,0,38,0,TAU);ctx.stroke();
-  /* a fenda — o olho da avareza, sempre em você */
-  ctx.fillStyle='#241d16';
-  ctx.beginPath();ctx.ellipse(0,-4,16,7,0,0,TAU);ctx.fill();
-  const look=Math.atan2(player.y-g.y,player.x-g.x);
-  ctx.fillStyle='#ff2e1f';
-  ctx.beginPath();ctx.arc(Math.cos(look)*5,-4+Math.sin(look)*2.4,3,0,TAU);ctx.fill();
-  /* o sorriso faminto */
-  ctx.strokeStyle='#241d16';ctx.lineWidth=2.4;
-  ctx.beginPath();ctx.arc(0,14,14,.15*Math.PI,.85*Math.PI);ctx.stroke();
-  for(let t2=0;t2<5;t2++){
-    const bx=-11+t2*5.5;
-    ctx.beginPath();ctx.moveTo(bx,18+Math.sin(game.t*3+t2)*1.4);ctx.lineTo(bx+2.6,24+Math.sin(game.t*3+t2)*1.4);ctx.stroke();
-  }
-  /* moedas orbitando */
-  for(let m2=0;m2<6;m2++){
-    const a=game.t*1.4+m2/6*TAU;
-    const ox=Math.cos(a)*62,oy=Math.sin(a)*30-6;
-    ctx.fillStyle=m2%2?'#ffbe5a':'#ffd9a0';
-    ctx.strokeStyle='#57431a';ctx.lineWidth=1.4;
-    ctx.beginPath();ctx.arc(ox,oy,5,0,TAU);ctx.fill();ctx.stroke();
-  }
-  ctx.restore();
-  /* barra de vida dourada durante a luta */
-  if(g.ph==='fight'){
-    const bw=430,bh=12,bx=W/2-bw/2,by=54;
-    ctx.fillStyle='rgba(8,6,4,.75)';ctx.fillRect(bx-3,by-3,bw+6,bh+6);
-    ctx.fillStyle='#3a2f14';ctx.fillRect(bx,by,bw,bh);
-    const hk=clamp(g.hp/g.maxHp,0,1);
-    ctx.fillStyle='#ffd35a';ctx.fillRect(bx,by,bw*hk,bh);
-    ctx.strokeStyle='rgba(255,217,160,.7)';ctx.lineWidth=1.4;ctx.strokeRect(bx,by,bw,bh);
-    txt('GANANCIA',W/2,by-14,DISP,15,'#ffd9a0','center',4);
-  }
-  /* o fio da avareza */
-  if(g.pat==='avareza'&&g.data&&g.data.on){
-    ctx.strokeStyle='rgba(255,211,90,'+(.5+.3*Math.sin(game.t*9))+')';ctx.lineWidth=2.4;
-    ctx.setLineDash([9,7]);
-    ctx.beginPath();ctx.moveTo(g.x,g.y);ctx.lineTo(player.x,player.y);ctx.stroke();
-    ctx.setLineDash([]);
-  }
-}
-function framePlaca(dt){
-  if(!PLACA)return;
-  PLACA.t+=dt;
-  const p=placaPos();
-  if(PLACA.ph===1)PLACA.readT+=dt;
-  /* v1.6.2: fase 2 = A LUTA DA GANANCIA (termina no roubo → fase 3).
-     v1.6.3: DORMANTE — GANANCIA_LUTA=false nunca deixa ph===2 no fluxo
-     normal (o __EXP.beginGanancia() do laboratório ainda pode chamar). */
-  if(PLACA.ph===2){
-    if(GN)frameGanancia(dt);
-    return;
-  }
-  /* o buraco abre devagar (aura rosa) — v1.6.2: agora é a FASE 3 */
-  if(PLACA.ph>=3)PLACA.hT+=dt;
-  /* entrar no buraco → o fim dos círculos */
-  if(PLACA.ph===3&&PLACA.hT>.9&&!player.dead&&dist(player.x,player.y,p.x,p.y-150)<44){
-    PLACA.ph=4;
-    game.state='won';game._placaFim=1;
-    try{blip('sine',880,180,1.1,.12);noiseSfx(1,.06,140,'lowpass');sfx.echo();}catch(e){}
-    showOv('placaFim');
-  }
-}
-/* desenhada DEPOIS do mundo (a placa, o buraco e as auras ficam COLORIDOS
-   no mundo cinza — é exatamente esse o efeito estranho) */
-function drawPlacaFx(){
-  /* ph<4 — a fase 3 (o buraco) vive depois da leitura (na v1.6.2 vinha
-     depois da LUTA; na v1.6.3 a luta está DORMANTE e o buraco abre direto) */
-  if(PLACA&&PLACA.ph<4){
-    const p=placaPos();
-    const pul=.5+.5*Math.sin(game.t*2.2);
-    /* a AURA DOURADA — estranha, viva, no mundo cinza */
-    const g=ctx.createRadialGradient(p.x,p.y-20,6,p.x,p.y-20,130+pul*30);
-    g.addColorStop(0,'rgba(255,217,160,'+(.32+.14*pul)+')');
-    g.addColorStop(.55,'rgba(255,190,90,.13)');
-    g.addColorStop(1,'rgba(255,150,40,0)');
-    ctx.fillStyle=g;ctx.fillRect(p.x-180,p.y-200,360,380);
-    /* a PLACA de pedra */
-    ctx.save();
-    ctx.translate(p.x,p.y);
-    ctx.fillStyle='#241d16';ctx.strokeStyle='#574f45';ctx.lineWidth=3;
-    ctx.beginPath();ctx.moveTo(-64,46);ctx.lineTo(-72,-36);ctx.lineTo(-38,-64);ctx.lineTo(38,-64);ctx.lineTo(72,-36);ctx.lineTo(64,46);ctx.closePath();ctx.fill();ctx.stroke();
-    ctx.strokeStyle='rgba(255,217,160,'+(.4+.25*pul)+')';ctx.lineWidth=1.5;
-    ctx.strokeRect(-48,-42,96,66);
-    ctx.fillStyle='rgba(255,217,160,'+(.7+.3*pul)+')';
-    ctx.font='30px IM Fell English SC,serif';ctx.textAlign='center';
-    ctx.fillText('I',0,-4);
-    ctx.font='9px IBM Plex Mono,monospace';ctx.fillStyle='rgba(230,218,196,.8)';
-    ctx.fillText('G A N A N C I A',0,16);
-    ctx.restore();
-    /* dica e leitura */
-    if(PLACA.ph===0&&dist(player.x,player.y,p.x,p.y)<130)txt(keyLabel(keybinds.interact[0])+' · LER A PLACA',p.x,p.y-96,MONO,10,'#ffd9a0','center',3);
-    /* a GANANCIA em pessoa (v1.6.3: DORMANTE — só desenha se a luta for
-       reativada pela flag ou chamada pelo laboratório) */
-    if(PLACA.ph===2)drawGanancia();
-    if(PLACA.ph===1){
-      const a=clamp(PLACA.readT/.4,0,1);
-      const bw=640,bh=124,bx0=W/2-bw/2,by0=H-208;
-      ctx.save();ctx.globalAlpha=a*.94;
-      ctx.fillStyle='rgba(8,6,4,.9)';ctx.fillRect(bx0,by0,bw,bh);
-      ctx.strokeStyle='rgba(255,217,160,.4)';ctx.lineWidth=1.5;ctx.strokeRect(bx0,by0,bw,bh);
-      ctx.font='13px IBM Plex Mono,monospace';ctx.fillStyle='#ffd9a0';ctx.textAlign='center';
-      for(let i=0;i<PLACA_LINHAS.length;i++)ctx.fillText(PLACA_LINHAS[i],W/2,by0+30+i*22);
-      ctx.font='9px IBM Plex Mono,monospace';ctx.fillStyle='rgba(230,218,196,.6)';
-      ctx.fillText(keyLabel(keybinds.interact[0])+' · sair da leitura',W/2,by0+bh-12);
-      ctx.restore();
-    }
-    /* O BURACO — luxuria (v1.6.2: depois da LUTA — fase 3) */
-    if(PLACA.ph>=3){
-      const hy=p.y-150,hk=clamp(PLACA.hT/.9,0,1);
-      const hg=ctx.createRadialGradient(p.x,hy,2,p.x,hy,78);
-      hg.addColorStop(0,'rgba(255,106,213,'+(.5*hk)+')');
-      hg.addColorStop(.5,'rgba(255,106,213,'+(.18*hk)+')');
-      hg.addColorStop(1,'rgba(255,106,213,0)');
-      ctx.fillStyle=hg;ctx.fillRect(p.x-92,hy-92,184,184);
-      ctx.fillStyle='rgba(10,4,14,'+(.94*hk)+')';
-      ctx.beginPath();ctx.ellipse(p.x,hy,44*hk,21*hk,0,0,TAU);ctx.fill();
-      ctx.strokeStyle='rgba(255,106,213,'+(.75*hk)+')';ctx.lineWidth=2;
-      ctx.beginPath();ctx.ellipse(p.x,hy,44*hk,21*hk,0,0,TAU);ctx.stroke();
-      ctx.fillStyle='rgba(255,106,213,'+(.6+.4*Math.sin(game.t*3)) +')';
-      txt('luxuria',p.x,hy-62,DISP,20,'#ff6ad5','center',4);
-      if(hk>=1&&dist(player.x,player.y,p.x,hy)<70)txt('ENTRAR',p.x,hy+46,MONO,9,'#ffc2ec','center',3);
-    }
-  }
-  /* a aura DOURADA vaza da PORTA DO BOSS nos cômodos vizinhos do limbo...? */
-  if(typeof limboCinza==='function'&&limboCinza()&&game.state==='play'&&!PLACA){
-    for(const d of game.doors){
-      const t=game.mapRooms[d.to];
-      if(!t||t.kind!=='boss')continue;
-      const pul=.5+.5*Math.sin(game.t*2.6);
-      const g=ctx.createRadialGradient(d.x,d.y,4,d.x,d.y,90);
-      g.addColorStop(0,'rgba(255,217,160,'+(.30+.16*pul)+')');
-      g.addColorStop(.5,'rgba(255,190,90,.12)');
-      g.addColorStop(1,'rgba(255,150,40,0)');
-      ctx.fillStyle=g;ctx.fillRect(d.x-110,d.y-120,220,220);
-      for(let i=0;i<6;i++){
-        const px2=d.x+Math.sin(game.t*1.3+i*2.4)*16;
-        const py2=d.y-((game.t*24+i*37)%76);
-        const al=1-((game.t*24+i*37)%76)/76;
-        ctx.fillStyle='rgba(255,217,160,'+(.55*al)+')';
-        ctx.beginPath();ctx.arc(px2,py2,1.6+i*.2,0,TAU);ctx.fill();
-      }
-    }
-  }
-}
 /* ---- API PÚBLICA (ganchos chamados pelo game.js/school.js) ---- */
 window.__EXPANSION={
   /* loop do play — 1 gancho no fim do updatePlay */
@@ -3924,7 +3535,6 @@ window.__EXPANSION={
       updateVulcanHazards(dt);
       updateCervo(dt);
       frameCerberus(dt); /* v1.3.1: as fases do Cérbero rodam NA LUTA (estado play) */
-      framePlaca(dt); /* v1.6.1: a placa do primeiro pecado (leitura → buraco → fim) */
       frameStairGate(dt); /* v1.3.3: a escada para o fundo (pisar = descer) */
       if(typeof frameLabStair==='function')frameLabStair(dt); /* v1.4.3: a escada da sala de testes */
       if(hTransCd>0)hTransCd-=dt;
@@ -4014,9 +3624,6 @@ window.__EXPANSION={
   /* overlay final (tint de zona + efeitos por cima) */
   draw:function(){
     try{
-      /* v1.6.1: a placa da GANÂNCIA e as auras douradas — por cima do mundo
-         cinza (é o único colorido que sobra, de propósito) */
-      if(game.state==='play')drawPlacaFx();
       const zn=zoneOf();
       if(game.state==='play'||game.state==='bossintro'){
         if(zn.z==='penumbra'&&zn.ph===2){
@@ -4031,7 +3638,7 @@ window.__EXPANSION={
             ctx.save();ctx.translate(tx,180);ctx.rotate(.5+sw*.01);ctx.fillRect(-1,-40,3,44);ctx.restore();
             ctx.save();ctx.translate(tx,H*.4);ctx.rotate(-.6);ctx.fillRect(-1,-36,3,40);ctx.restore();
           }
-        }else if(zn.z==='peninf'||zn.z==='limbinf'){
+        }else if(zn.z==='peninf'||(zn.z==='limbinf'&&zn.ph<2)){ /* v1.6.2: o véu de fogo/fissuras morre na fase cinza (limbinf fase 2) — o fundo fica LISO */
           /* v1.3.5: o chão queimado já vem do wash — na Infernal, véu de calor
              geral + brasa subindo pelas laterais da tela; a limbinf mantém o
              véu leve de sempre */
@@ -4173,20 +3780,7 @@ window.__EXPANSION={
   },
   /* entrada de sala / sala de chefe / intro do juiz */
   onEnterRoom:onEnterRoom,
-  /* v1.6.1: A SALA DO PRIMEIRO PECADO — a placa no lugar do chefe */
-  beginGananciaPlaca:function(){try{beginGananciaPlaca();}catch(e){}},
-  placaInteract:function(){try{return placaInteract();}catch(e){return false;}},
-  placaActive:function(){return !!PLACA;},
-  placaState:function(){return PLACA;}, /* v1.6.3: fase da placa (0 ler, 1 lendo, 2 luta DORMANTE, 3 luxuria, 4 fim) */
-  /* v1.6.2: a GANANCIA em pessoa — hooks para o laboratório e os testes */
-  beginGanancia:function(){try{beginGanancia();}catch(e){}},
-  gananciaState:function(){return GN;},
-  gananciaActive:function(){return gananciaAlive();},
-  gananciaHurt:function(n){if(GN&&GN.ph==='fight'){GN.hp-=n||100;}},
   beginJuizIntro:function(){
-    /* v1.6.1: o JUIZ não entra mais pelo caminho normal — a sala do chefe do
-       limbo tem a PLACA DO PRIMEIRO PECADO. A intro do Juiz segue INTACTA
-       aqui (o laboratório e o futuro "ganancia" podem reaproveitá-la). */
     try{
       game.state='juizintro';
       game.juizIntroT=0;
@@ -4371,29 +3965,7 @@ try{
   buildDiffUI();bindWeaponCards();
   bind('bookTabSyn','click',function(){audio();game._bookTab='syn';renderSynTab();blip('sine',500,650,.05,.03);});
 }catch(e){console.warn('[exp] boot',e);}
-/* v1.6.1: os DOIS BOTÕES do fim dos círculos — modo infinito ou menu */
-try{
-  bind('placaInfBtn','click',function(){
-    hideOv('placaFim');
-    PLACA=null;game._placaFim=0;game._infinito=1;
-    game.state='play';
-    try{
-      nextFloor();
-      texts.push({x:W/2,y:H*.24,txt:'MODO INFINITO — a descida não termina',t:0,life:3,c:'#ffd9a0',size:14,disp:true});
-      texts.push({x:W/2,y:H*.28,txt:'o limbo...? continua — e continua — e continua',t:0,life:3,c:'#9c8f7c',size:10,disp:true});
-      sfx.echo();
-    }catch(e){console.warn('[exp] infinito',e);}
-  });
-  bind('placaMenuBtn','click',function(){
-    hideOv('placaFim');
-    PLACA=null;game._placaFim=0;
-    ['dead','win','pause','limboLoading','circles'].forEach(hideOv);
-    initAttract();
-    showOv('menu');
-    blurActive();
-  });
-}catch(e){console.warn('[exp] placaFim boot',e);}
 /* marca para diagnóstico */
-window.__EXP_VERSION='1.6.5'; /* v1.4.0: remaster.js entra ao lado · v1.6.1 o julgamento verdadeiro · v1.6.2 o pecado da ganancia · v1.6.3 SÓ A PLACA (a luta da ganancia DORMANTE atrás de GANANCIA_LUTA) · v1.6.4 O PONTO NO SHIFT: hitR 8→5 e o ponto vermelho SÓ no SHIFT · v1.6.5 O ATALHO AO CINZA: botão O LIMBO CINZA · TESTE cai direto na ÚLTIMA fase do limbo...? */
+window.__EXP_VERSION='1.9.2'; /* v1.4.0: remaster.js entra ao lado · v1.6.0 o conserto das salas (bênção mínima na secreta, rei fecha a sala, explosivo quebra porta de inimigo/puzzle, itens sem despawn, hitbox 4px, botão do limbo final) · v1.6.1 a besta tem rosto (besta.png na tela de morte) + encaixe total na resolução (sem barras de rolagem) · v1.6.2 o carrossel das armas + limbo sem travadas + fase cinza LISA · v1.6.3 os quatro feitiços (Grimório Rasgado, Investida Ricochete, Fios da Morte, Maré de Magma) + loja em destaque + drops fora das paredes + portal espera a bênção */
 })(); /* fim da IIFE da expansão */
 /*__CHUNK4B_END__*/

@@ -100,9 +100,26 @@ function optionsOpen(){const el=ov('options');return el&&!el.classList.contains(
 const cv=ov('cv'),ctx=cv.getContext('2d'),W=1280,H=720;
 const view={s:1,ox:0,oy:0,dpr:1};
 function resize(){view.dpr=Math.min(window.devicePixelRatio||1,2);cv.width=innerWidth*view.dpr;cv.height=innerHeight*view.dpr;cv.style.width=innerWidth+'px';cv.style.height=innerHeight+'px';view.s=Math.min(innerWidth/W,innerHeight/H);view.ox=(innerWidth-W*view.s)/2;view.oy=(innerHeight-H*view.s)/2;}
-addEventListener('resize',resize);resize();
+addEventListener('resize',resize);
+/* v1.6.1: ENCAIXE TOTAL — o jogo inteiro acompanha QUALQUER resolução sem
+   barra de rolagem: além do resize clássico, re-encaixa na rotação do celular,
+   ao entrar/sair da tela cheia (F11), no visualViewport (zoom/barras do
+   sistema) e com um segundo passe atrasado (navegadores assentam o layout
+   tarde). Tudo idempotente: chamar de novo não quebra nada. */
+addEventListener('orientationchange',resize);
+addEventListener('fullscreenchange',resize);
+if(screen.orientation&&screen.orientation.addEventListener){try{screen.orientation.addEventListener('change',resize);}catch(e){}}
+if(window.visualViewport){try{visualViewport.addEventListener('resize',resize);}catch(e){}}
+let __rszT=null;
+addEventListener('resize',function(){if(__rszT)clearTimeout(__rszT);__rszT=setTimeout(resize,260);});
+resize();
 /* ============ sala atual ============ */
 const ROOM={x:0,y:0,w:W,h:H,inverted:false};
+/* v1.6.2: paredes espelhadas do Falso Paraíso — PRÉ-CALCULADAS. A versão
+   antiga varria as bordas e criava 2 gradientes + clip POR SEGMENTO POR
+   FRAME (era a travada do Limbo); agora os segmentos externos nascem na
+   construção da sala e a parte estática fica numa camada em cache. */
+let paradiseSegs=[],paradiseWallsCache=null,paradiseWallsKey='';
 /* ============================================================
    v1.5.0 "OS SALÕES DO DANMAKU" — portão do novo combate.
    dmk(): FÁCIL = perfil LEGADO (padrões antigos, arenas antigas,
@@ -201,6 +218,11 @@ function finishVS(){
   /* o ritual de surgimento do mini-chefe acontece agora, como sempre */
   const t=v.info.type;
   spawnMarkAt(t,game.absMain.x+game.absMain.w/2,game.absMain.y+game.absMain.h*.3,true,!!v.info.kaizo);
+  /* v1.6.4: A CORTE DUPLA — o gêmeo acorda junto (5% das salas, 80% da vida) */
+  if(v.info.twin){
+    spawnMarkAt(t,game.absMain.x+game.absMain.w*.32,game.absMain.y+game.absMain.h*.64,true,!!v.info.kaizo,.8);
+    texts.push({x:W/2,y:H*.32,txt:'A CORTE DUPLA',t:0,life:2,c:'#ff2450',size:15,disp:true});
+  }
   try{sfx.roar();}catch(e){}
 }
 /* retrato do mini-chefe para a apresentação (objeto temporário só de desenho) */
@@ -478,7 +500,23 @@ if(!e.repeat&&game.state==='builder'){
 if(e.code==='Enter')builderTest();
 else if(e.code==='KeyX'){game.builder.items=[];blip('square',300,140,.1,.07);}
 }
-if(e.code==='Enter'&&game.state==='menu'&&!optionsOpen())openWeaponSelect();
+/* v1.6.2: no CARROSSEL de armas — ◀/▶ (setas) trocam o lado,
+   ENTER/ESPAÇO confirma a arma da frente. Só com o overlay aberto. */
+try{
+if(!e.repeat&&!optionsOpen()){
+  const _wo=ov('weapons');
+  if(_wo&&!_wo.classList.contains('hidden')&&window.wCarMove){
+    if(e.code==='ArrowLeft'){e.preventDefault();window.wCarMove(-1);}
+    else if(e.code==='ArrowRight'){e.preventDefault();window.wCarMove(1);}
+    else if((e.code==='Enter'||e.code==='Space')&&(game.state==='select'||game.state==='menu')){
+      e.preventDefault();
+      if(window.wCarConfirm)window.wCarConfirm();
+      return;
+    }
+  }
+}
+}catch(_e){}
+if(e.code==='Enter'&&game.state==='menu'&&!optionsOpen()&&!_entryShown()&&!(window.__BOOK&&window.__BOOK.introBusy&&window.__BOOK.introBusy()))openWeaponSelect(); /* v1.9.1: na ENTRADA o Enter é do INICIAR — e durante a cutscene do livro nada abre por baixo */
 });
 addEventListener('keyup',e=>{keys[e.code]=false;});
 function captureKey(code){
@@ -679,6 +717,11 @@ const f=roomFloor.getContext('2d');
 peninfEdgePts.length=0;game.outerFires=null; /* v1.3.5 */
 const inv=ROOM.inverted;
 const paradise=isParadiseFloor()&&!inv;
+/* v1.6.2: A FASE CINZA — no último véu do Limbo (fase 4+) o paraíso acabou:
+   chão CINZA LISO, sem estrutura nenhuma (sem grama, pedras, flores,
+   rachaduras, paredes espelhadas ou pólen) e o fundo lá fora segue liso. */
+const limboGray=paradise&&(game.limboPhase||1)>=4;
+if(!paradise){paradiseSegs=[];paradiseWallsCache=null;paradiseWallsKey='';}
 /* v1.3.3: paletas por zona — v1.3.4: só a PENUMBRA INFERNAL tem paleta
    própria (chão EBRANQUIÇADO queimando nas bordas); a Penumbra das Almas
    voltou ao piso ESCURO de sempre. Demais regiões intactas. */
@@ -687,10 +730,7 @@ if(!inv&&!paradise&&(game.region||'penumbra')==='penumbra'&&(game.floor||1)>2){
 zonePal={id:'peninf',bg:'#e9e3d6',grid:'rgba(92,42,20,0.10)',edge:'#a33417'};
 }
 const zp=zonePal;
-/* v1.6.2: o limbo...? — o CINZA nasce NO CHÃO DE VERDADE (sem filtro de tela):
-   grama morta, terra cinza, sem flores — o terreno é desenhado já morto */
-const cin=(!inv&&paradise&&typeof limboCinza==='function'&&limboCinza());
-const bg=inv?'#e9e7e0':(paradise?(cin?'#454a40':'#3c5a2a'):(zp?zp.bg:'#0f0b0e'));
+const bg=inv?'#e9e7e0':(paradise?(limboGray?'#4a4741':'#3c5a2a'):(zp?zp.bg:'#0f0b0e'));
 const rects=game.absRects.map(r=>({x:r.x-ROOM.x,y:r.y-ROOM.y,w:r.w,h:r.h}));
 for(const rc of rects){f.fillStyle=bg;f.fillRect(rc.x,rc.y,rc.w,rc.h);}
 f.save();f.beginPath();
@@ -700,7 +740,10 @@ if(paradise){
   /* ===== gramado do Falso Paraíso =====
      base verde com variações tonais para dar volume ao terreno,
      tufos de grama espalhados, manchas de terra, pequenas pedras e
-     ocasionalmente flores brancas — tudo muito espaçado. */
+     ocasionalmente flores brancas — tudo muito espaçado.
+     v1.6.2: FASE CINZA (fase 4+ do Limbo) — nada disto existe: o chão
+     é SÓ o cinza liso, sem estrutura nenhuma. */
+  if(!limboGray){
   const distort=paradiseDistort();
   /* variações tonais do terreno — manchas de grama mais clara/escura */
   const nPatches=Math.round(60*(ROOM.w*ROOM.h)/(W*H))+10;
@@ -711,9 +754,9 @@ if(paradise){
     f.scale(1,rnd(.4,.85));
     f.beginPath();f.arc(0,0,rnd(22,90),0,TAU);
     const tone=rnd(0,1);
-    if(tone<.4)f.fillStyle=cin?'rgba(92,96,88,0.32)':'rgba(78,108,52,0.32)';
-    else if(tone<.75)f.fillStyle=cin?'rgba(126,130,120,0.22)':'rgba(118,148,82,0.22)';
-    else f.fillStyle=cin?'rgba(66,70,62,0.28)':'rgba(52,82,38,0.28)';
+    if(tone<.4)f.fillStyle='rgba(78,108,52,0.32)';
+    else if(tone<.75)f.fillStyle='rgba(118,148,82,0.22)';
+    else f.fillStyle='rgba(52,82,38,0.28)';
     f.fill();f.restore();
   }
   /* tufos de grama — pequenos traços verdes */
@@ -722,7 +765,7 @@ if(paradise){
   for(let i=0;i<nTufts;i++){
     const gx=rnd(ROOM.w),gy=rnd(ROOM.h);
     const base=rnd(0,1);
-    const col=base<.5?(cin?'rgba(104,106,96,0.8)':'rgba(72,100,46,0.85)'):(cin?'rgba(126,128,118,0.8)':'rgba(96,128,62,0.85)');
+    const col=base<.5?'rgba(72,100,46,0.85)':'rgba(96,128,62,0.85)';
     f.strokeStyle=col;
     f.beginPath();f.moveTo(gx,gy);f.lineTo(gx-1.6,gy-5.2);f.stroke();
     f.beginPath();f.moveTo(gx,gy);f.lineTo(gx+1.4,gy-6);f.stroke();
@@ -736,7 +779,7 @@ if(paradise){
     f.rotate(rnd(TAU));
     f.beginPath();
     f.ellipse(0,0,rnd(28,72),rnd(16,42),0,0,TAU);
-    f.fillStyle=cin?'rgba(64,60,56,0.4)':'rgba(82,66,46,0.34)';
+    f.fillStyle='rgba(82,66,46,0.34)';
     f.fill();
     f.restore();
   }
@@ -750,7 +793,7 @@ if(paradise){
     f.beginPath();f.ellipse(sx+sr*.3,sy+sr*.3,sr*.6,sr*.4,0,0,TAU);f.fill();
   }
   /* flores brancas — raras e perturbadoramente perfeitas */
-  const nFlowers=cin?0:Math.round(4*(ROOM.w*ROOM.h)/(W*H))+1; /* v1.6.2: sem flores no limbo...? — o cenário morreu */
+  const nFlowers=Math.round(4*(ROOM.w*ROOM.h)/(W*H))+1;
   for(let i=0;i<nFlowers;i++){
     const fx=rnd(ROOM.w),fy=rnd(ROOM.h);
     f.fillStyle='rgba(255,250,235,0.92)';
@@ -762,7 +805,7 @@ if(paradise){
     f.beginPath();f.arc(fx,fy,1.2,0,TAU);f.fill();
   }
   /* pequenas elevações no terreno — contornos suaves de nível */
-  f.strokeStyle=cin?'rgba(84,88,80,0.2)':'rgba(56,82,38,0.18)';f.lineWidth=1.2;
+  f.strokeStyle='rgba(56,82,38,0.18)';f.lineWidth=1.2;
   const nHills=2+Math.floor(ROOM.w*ROOM.h/(W*H)*3);
   for(let i=0;i<nHills;i++){
     f.save();
@@ -771,25 +814,6 @@ if(paradise){
     f.ellipse(0,0,rnd(60,140),rnd(20,50),rnd(0,Math.PI),0,TAU);
     f.stroke();
     f.restore();
-  }
-  /* v1.6.2: o limbo...? — CENÁRIO MORTO de verdade no chão: cinza acumulada
-     e tufos secos espalhados por todo o terreno (desenhados, não filtrados) */
-  if(cin){
-    const nAsh=Math.round(26*(ROOM.w*ROOM.h)/(W*H))+8;
-    for(let i=0;i<nAsh;i++){
-      const ax=rnd(ROOM.w),ay=rnd(ROOM.h),ar=rnd(14,60);
-      const ag=f.createRadialGradient(ax,ay,1,ax,ay,ar);
-      ag.addColorStop(0,'rgba(28,28,26,0.34)');
-      ag.addColorStop(1,'rgba(28,28,26,0)');
-      f.fillStyle=ag;f.beginPath();f.arc(ax,ay,ar,0,TAU);f.fill();
-    }
-    f.lineWidth=1;f.lineCap='round';
-    const nDead=Math.round(90*(ROOM.w*ROOM.h)/(W*H))+30;
-    for(let i=0;i<nDead;i++){
-      const gx=rnd(ROOM.w),gy=rnd(ROOM.h);
-      f.strokeStyle='rgba(58,58,52,0.75)';
-      f.beginPath();f.moveTo(gx,gy);f.lineTo(gx+rnd(-3,3),gy-rnd(3,7));f.stroke();
-    }
   }
   /* distorção progressiva — rachaduras finas no chão a partir do andar 3 */
   if(distort>.3){
@@ -819,14 +843,28 @@ if(paradise){
       f.beginPath();f.arc(dx,dy,dr,0,TAU);f.fill();
     }
   }
+  } /* v1.6.2: fim do if(!limboGray) — na fase cinza NADA foi desenhado no chão */
   f.restore();
   /* NÃO desenha as linhas brancas sólidas — as paredes espelhadas
-     são desenhadas dinamicamente por drawParadiseWalls() a cada frame. */
+     são desenhadas dinamicamente por drawParadiseWalls() a cada frame.
+     v1.6.2: na fase cinza elas NEM EXISTEM (drawParadiseWalls volta cedo). */
   groundEmbers.length=0;
+  if(!limboGray){
   /* partículas ambientais do paraíso: pólen dourado flutuando */
   const m=rects[0];
   const nAmbient=Math.round(14*(ROOM.w*ROOM.h)/(W*H))+6;
   for(let i=0;i<nAmbient;i++)groundEmbers.push({x:ROOM.x+rnd(30,m.w-30),y:ROOM.y+rnd(30,m.h-30),ph:rnd(TAU),paradise:true});
+  /* v1.6.2: segmentos externos das paredes espelhadas PRÉ-CALCULADOS aqui
+     (1× por sala) + camada estática pintada numa camada em cache — o frame
+     inteiro vira 1 drawImage + brilhos baratos. Era aqui que o Limbo travava. */
+  buildParadiseSegs();
+  }else{
+  /* v1.6.2: FASE CINZA — a única marca no piso é a borda de sempre, num
+     traço cinza-escuro; sem paredes espelhadas e sem pólen: tudo liso */
+  f.strokeStyle='#242220';f.lineWidth=3;f.lineCap='round';
+  for(const rc of rects)f.strokeRect(rc.x+1.5,rc.y+1.5,rc.w-3,rc.h-3);
+  paradiseSegs=[];paradiseWallsCache=null;paradiseWallsKey='';
+  }
   return;
 }
 /* v1.3.5: sem as manchas escuras no chão de zona própria (o branco da
@@ -1084,7 +1122,6 @@ estrelaT:0,furiaT:0,furiaDur:0,
 /* v0.9.6: novos itens e debuffs */
 bloodShots:false,tearShots:false,fomeDrain:false,falseHeart:false,glassBody:false,blindHaste:false,isolation:false,endlessHunger:false,hungerT:0,
 region:'penumbra',postCerberusFloors:0,limboPending:false,limboLoadT:0,limboLoadDur:2.6,gatePending:false, /* v1.5.3: TESTE — porta direta para o caminho do portão (v1.5.9: botão de volta) */
-limboTestPending:false, /* v1.6.5: TESTE — porta direta para a ÚLTIMA fase do limbo cinza (o botão O LIMBO CINZA · TESTE) */
 /* ==== v0.9.1: O MUNDO — magia de parar o tempo ==== */
 hasWorld:false,worldT:0,worldDur:3,worldLevel:0,
 elements:{gelo:0,fogo:0,veneno:0,trovao:0},elemCycle:0,multi:0,
@@ -1127,10 +1164,12 @@ let telegraphs=[];
 let actMinions=[];
 let thrownSaw=null,lightBeam=null;
 let heartsPopT=0,heartsPopIdx=0;
-/* v1.4.6: HITBOX DE VERDADE — player.hitR é a hitbox de DANO (tamanho de um
-tiro normal, 5px). O r:11 continua para movimento/portas/itens; qualquer
-dano recebido usa hitR — aperte SHIFT para ver o circulo */
-const player={x:W/2,y:H*.75,r:11,hitR:5,hp:100,maxHp:100,inv:0,dashT:0,dashCd:0,dashAng:0,angle:-Math.PI/2, /* v1.6.4: hitR 8→5 — A HITBOX DIMINUIU (pedido): de volta ao tamanho de um tiro; o ponto vermelho SÓ aparece segurando SHIFT */
+/* v1.4.6: HITBOX DE VERDADE — player.hitR é a hitbox de DANO. O r:11 continua
+para movimento/portas/itens; qualquer dano recebido usa hitR — aperte SHIFT
+para ver o circulo. v1.6.0: hitbox menor ainda — 4px (era 5px): um tiro
+agora passa raspando onde antes acertava. O ponto carmesim SÓ aparece
+com SHIFT segurado (FOCO) — igual sempre foi, agora explícito. */
+const player={x:W/2,y:H*.75,r:11,hitR:4,hp:100,maxHp:100,inv:0,dashT:0,dashCd:0,dashAng:0,angle:-Math.PI/2,
 shotT:0,biteT:0,slowT:0,walkT:0,dustT:0,dead:false,mvx:0,mvy:0,
 sawT:0,swordT:0,sawAim:0,sawAnim:0,sawThrowCd:0};
 /* v1.5.0: câmera do mundo + estado da transição deslizante/apresentação VS */
@@ -1379,8 +1418,6 @@ boss.active=false;boss.introLock=false;boss.dying=false;boss.phase2=false;
 boss.x=W/2;boss.y=H*.32;boss.angle=Math.PI/2;boss.scale=0;boss.fade=1;
 boss.barT=0;boss.bodyWob=rnd(10);boss.dashing=false;boss.recoverT=0;boss.chargeAim=Math.PI/2;
 boss.frenzyActive=false;boss.frenzyT=0;boss.frenzyCd=7;boss.frenzyPause=0;
-/* v1.6.0: o ANEL QUE ACELERA (substitui o frenesi) — relógio próprio */
-boss.ringAcc=0;boss.ringT=0;boss.ringInt=1.6;
 boss.activeHeadIdx=0;boss.headTurn=0;
 /* Cérbero mais duro: ~67% mais vida que antes */
 const hhp=Math.round((game.hard?2500:1500)*1.0);
@@ -1442,7 +1479,7 @@ game.roomQueue=[];
 game.hasShot=game.weapon==='shot';game.hasBite=game.weapon==='bite';
 /* ==== v0.9.0: reset de variáveis da expansão ==== */
 game.region='penumbra';game.postCerberusFloors=0;
-game.limboPending=false;game.limboLoadT=0;game.gatePending=false;game.limboTestPending=false; /* v1.5.3 · v1.6.5 */
+game.limboPending=false;game.limboLoadT=0;game.gatePending=false; /* v1.5.3 */
 game._arenaLock=false; /* v1.5.4: a trava de escada da arena do Cérbero nunca atravessa runs */
 game.caronteBoss=null;game.carontePhase=0;game.caronteDialogIdx=0;game.caronteDialogT=0;game.caronteFightT=0;
 game.caronteT=0;game.caronteChant=0;game.caronteAccepted=false;
@@ -1609,7 +1646,7 @@ if(window.__danteEnter)window.__danteEnter();
 /* salva limboPending antes de resetAll (que o resetaria para false) */
 const wasLimboPending=game.limboPending;
 const wasGatePending=game.gatePending; /* v1.5.3: TESTE — caminho do portão direto (v1.5.9: de volta a pedido do usuário) */
-const wasLimboTestPending=game.limboTestPending; /* v1.6.5: TESTE — última fase do limbo cinza direto */
+const wasLimboTest=game.limboTestPending; /* v1.6.0: TESTE — última fase do Limbo direto */
 blurActive();resetAll();
 if(window.__EXPANSION)window.__EXPANSION.onRunStart(); /* v1.3.0: dificuldade/modificadores */
 /* v0.9.13→14: MODO NERDCIRNO67 — runs começadas com ele ativo NÃO concedem bênçãos */
@@ -1673,32 +1710,23 @@ if(wasGatePending){
   rollTitleFont();
   return;
 }
-/* ==== v1.6.5: TESTE — limboTestPending pula TUDO: arma escolhida → direto
-   para a ÚLTIMA FASE do limbo cinza (o limbo...? — fase 4: chão morto,
-   quase sem inimigos, a aura dourada vazando da porta do chefe e a placa
-   do primeiro pecado no quarto extra). Pedido: ver se a última fase do
-   limbo cinza está funcionando corretamente — sem descer andar nenhum. ==== */
-if(wasLimboTestPending){
+/* ==== v1.6.0: TESTE — limboTestPending pula TUDO: arma escolhida → direto
+   para A ÚLTIMA FASE DO LIMBO (fase 4 — O LIMBO INFERNAL — FASE 2, andar 9,
+   onde a descida cinza termina no Juiz Sem Rosto). ==== */
+if(wasLimboTest){
   game.limboTestPending=false;
-  game.region='limbo';game.floor=7;game.limboPhase=4; /* fase 4 = a última; limboCinza() ativo (fase≥3) */
-  game.postCerberusFloors=0;game.usedMinis=[];
-  game.state='play';
-  game.portal=null;game.extraIdx=-1;
-  game.rkP2=false;game.rkUlt=null;
-  boss.active=false;boss.barT=0; /* v1.6.0: a barra do Cérbero nunca chega ao Limbo */
-  paradiseOutsideCache=null;
-  game.mapRooms=genMap();game.seenGlyphs=[];
+  game.hard=(diffSel!=='normal'&&diffSel!=='facil');
+  game.region='limbo';game.limboPhase=4;game.floor=9;game.postCerberusFloors=0;
+  game.usedMinis=[];game.portal=null;game.extraIdx=-1;game.rkP2=false;game.rkUlt=null;
+  game._bcActive=false;game.pendingLimboFloor=9;
+  game.seenGlyphs=[];paradiseOutsideCache=null;
+  game.mapRooms=genMap();
+  game.state='play';rollTitleFont();
   game.roomIdx=-1;
-  /* re-aplica a arma escolhida (resetAll zerou) — como no corredor do limbo */
-  game.hasShot=game.weapon==='shot';
-  game.hasBite=game.weapon==='bite';
-  if(game.hasShot)player.shotT=.3;
-  if(game.hasBite)player.biteT=.3;
   enterRoom(0,null);
-  game.banner={type:'circle',txt:'...',name:'o limbo...? — FASE 4',sub:'TESTE — a última fase do limbo cinza · varra o mapa: a placa espera no fim',t:0,dur:4.2};
-  rollTitleFont();
-  sfx.rumble();sfx.echo();
-  blip('sine',150,90,.4,.09);
+  game.banner={type:'circle',txt:'TESTE — FASE FINAL',name:'O LIMBO INFERNAL — FASE 2',sub:'o último véu antes do fim da descida — varra o mapa e o Juiz desperta',t:0,dur:4.4};
+  sfx.levelup();sfx.echo();blip('sine',220,440,1.2,.12);
+  game.flash=.5;
   return;
 }
 game.postCerberusFloors=0;
@@ -1733,7 +1761,7 @@ if(r.isolated){
   const opp={n:'s',s:'n',e:'w',w:'e'};
   const od=opp[r.hostDir]||'s';
   const p=doorPos(od);
-  game.doors.push({dir:od,to:r.hostIdx,x:p.x,y:p.y,open:true,extra:false,hidden:false});
+  game.doors.push({dir:od,to:r.hostIdx,x:p.x,y:p.y,open:!(r.kind==='sboss'&&r.sbossKind==='rei'&&!r.cleared),extra:false,hidden:false});
  }
  return;
 }
@@ -1745,7 +1773,7 @@ const tgt=game.mapRooms[to];
 /* v1.0.0: a porta da SALA SECRETA não existe para o olho — vira uma parede
    rachada, invisível no mapa, que só detona com uma FAGULHA EXPLOSIVA.
    Depois de explodida (tgt.blasted), ela volta a ser porta de verdade. */
-game.doors.push({dir:dir,to:to,x:p.x,y:p.y,open:false,extra:game.extraIdx===to,
+game.doors.push({dir:dir,to:to,x:p.x,y:p.y,open:!!(r.doorBlown&&r.doorBlown[dir]),extra:game.extraIdx===to,
 hidden:!!(tgt&&tgt.kind==='secret'&&!tgt.blasted)});
 }
 }
@@ -2480,12 +2508,23 @@ function startSecretBossIntro(kind,r){
  }else{
   game.roomQueue=[];
   game.state='reiintro';game.reiT=0;game.reiSpawned=false;
+  /* v1.6.0: O REI FECHA A SALA — entrou na sala secreta dele, não existe
+     volta: TODAS as portas se fecham (inclusive a rachadura da sala
+     isolada) até o rei cair. A morte dele reabre (updateReiDeath →
+     openDoors), como sempre fez. */
+  for(const d of game.doors)d.open=false;
+  game.shake=Math.max(game.shake,6);
   sfx.creak();blip('sine',80,40,1.4,.1);
  }
 }
 function enterRoom(i,fromDir){
+ /* v1.6.0: guarda a origem da sala ATUAL antes de trocar — os itens no chão
+    (bênçãos, pactos, almas, vida, fagulhas, itens únicos) vão ser guardados
+    NA SALA que estamos deixando, e voltam ao reentrar. Nada some. */
+ const prevRoom=game.mapRooms[game.roomIdx];const prevOX=ROOM.x,prevOY=ROOM.y;
  game.roomIdx=i;
- game.portal=null;
+ game.portal=null;game._blessGateHint=false; /* v1.6.3: dica da bênção vale por sala */
+ game._kzRush=false; /* v1.6.4: A ENXURRADA — só salas kaizo aceleram as balas */
  game.reiT=0;game.reiSpawned=false;
  game.rkP2=false;game.rkUlt=null;game.rkUltT=0;
  game.windowScene=null;
@@ -2506,8 +2545,6 @@ function enterRoom(i,fromDir){
  if(first){r.visited=true;game.globalRoom++;META.rooms=Math.max(META.rooms,game.globalRoom);saveMeta();}
  game.roomKind=r.kind;
  game.threat=clamp(Math.round(game.floor*2+countCleared()*.7),1,18);
- /* v1.6.1: o limbo...? é MAIS FRACO — ameaça pela metade (vida/velocidade dos inimigos caem junto) */
- if(limboCinza())game.threat=Math.max(1,Math.round(game.threat*.5));
  game.waveT=0;game.waveState='intro';game.spawnT=.3;game.roomQueue=[];
  game.roomEvent=null;game.shopItems=[];game.shopNear=null;game.keeper=null;game.keeperNear=false;game.e404T=0;game.e404Spawned=false;
  /* v0.9.6/v0.9.7: sala de sacrifício e de loja são mutuamente excludentes —
@@ -2522,7 +2559,15 @@ function enterRoom(i,fromDir){
  }
  bullets=[];ebullets=[];rings=[];geyserMarks=[];spawnMarks=[];shockwaves=[];enemies=[];
  telegraphs=[];actMinions=[];/* v0.9.16: limpa avisos/minions ao trocar de sala */
- thrownSaw=null;lightBeam=null;pickups=[];
+ thrownSaw=null;lightBeam=null;
+ /* v1.6.0: SEM DESPAWN AO SAIR DA SALA — em vez de apagar tudo, os itens do
+    chão são guardados na sala que ficamos (menos baús, que têm o próprio
+    sistema de re-push). Ao reentrar, eles voltam exatamente onde estavam. */
+ if(prevRoom&&pickups.length){
+  const keepPk=pickups.filter(function(p){return p.type!=='chest';});
+  if(keepPk.length)prevRoom.savedPk={ox:prevOX,oy:prevOY,items:keepPk};
+ }
+ pickups=[];
  if(r.kind==='boss'){
   /* v1.5.0: a arena do chefe usa a FORMA da sala (danmaku = arena maior,
      ~1.69× a área; FÁCIL = tela cheia de sempre), centrada no mundo */
@@ -2552,6 +2597,14 @@ function enterRoom(i,fromDir){
  game.absRects=sh.rects.map(rc=>({x:rc.x+ax,y:rc.y+ay,w:rc.w,h:rc.h}));
  game.absMain=game.absRects[0];
  buildRoomFloor();buildDoors();
+ /* v1.6.0: DEVOLVE os itens guardados desta sala — deslocados pela
+    diferença da nova origem (o layout re-sorteia o deslocamento a cada
+    visita). Baús ficam com o sistema antigo. */
+ if(r.savedPk){
+  const sdx=ROOM.x-r.savedPk.ox,sdy=ROOM.y-r.savedPk.oy;
+  for(const q of r.savedPk.items){q.x+=sdx;q.y+=sdy;pickups.push(q);}
+  r.savedPk=null;
+ }
  const opp={n:'s',s:'n',e:'w',w:'e'};
  if(fromDir&&r.doors[opp[fromDir]]>=0){
   const dp=doorPos(opp[fromDir]);
@@ -2605,11 +2658,18 @@ function enterRoom(i,fromDir){
    game.roomQueue=buildRoomQueue('combat');
   }else if(r.kind==='miniboss'){
    const t=r.miniType||'mb';
+   /* v1.6.4: A CORTE DUPLA — 5% das salas de chefe acordam DOIS senhores de uma vez */
+   if(!r._twinRolled){r._twinRolled=true;if(Math.random()<.05)r._twin=true;}
+   game._kzRush=!!r.kaizo; /* v1.6.4: balas 30% mais rápidas na sala kaizo */
    /* v1.5.0: APRESENTAÇÃO VS (Thor — VS — Mini-Chefe) na primeira visita;
       o ritual de surgimento dele acontece logo depois, como sempre fez */
-   if(!r._vsDone){r._vsDone=true;game._vsPending={type:t,kaizo:!!r.kaizo,neo:!!r._neo};}
-   else spawnMarkAt(t,game.absMain.x+game.absMain.w/2,game.absMain.y+game.absMain.h*.3,true,!!r.kaizo);
-   game.banner={type:'boss',txt:miniDisplayName(t,!!r.kaizo,!!r._neo),sub:(r._neo&&r.kaizo)?'neo kaizo — a forma branca, acelerada de novo':r._neo?'a forma acelerada — ataques quase contínuos':r.kaizo?'a forma branca do abismo — padrões que você nunca viu':'o chefe deste mapa',t:0,dur:2.2}; /* v1.6.2: o repetido no kaizo se apresenta como NEO KAIZO */
+   if(!r._vsDone){r._vsDone=true;game._vsPending={type:t,kaizo:!!r.kaizo,neo:!!r._neo,twin:!!r._twin};}
+   else{
+     spawnMarkAt(t,game.absMain.x+game.absMain.w/2,game.absMain.y+game.absMain.h*.3,true,!!r.kaizo);
+     if(r._twin){spawnMarkAt(t,game.absMain.x+game.absMain.w*.32,game.absMain.y+game.absMain.h*.64,true,!!r.kaizo,.8);
+       texts.push({x:W/2,y:H*.32,txt:'A CORTE DUPLA',t:0,life:2,c:'#ff2450',size:15,disp:true});}
+   }
+   game.banner={type:'boss',txt:miniDisplayName(t,!!r.kaizo,!!r._neo),sub:r._twin?'a corte dupla — DOIS senhores numa sala só':r._neo?'a forma acelerada — ataques quase contínuos':r.kaizo?'a forma branca do abismo — padrões que você nunca viu':'o chefe deste mapa',t:0,dur:2.2};
    sfx.roar();game.shake=10;
   }else if(r.kind==='challenge'){
    game.roomQueue=buildRoomQueue('challenge');
@@ -2665,6 +2725,14 @@ function enterRoom(i,fromDir){
      game.banner={type:'small',txt:'SALA SECRETA',sub:'+4 de vida máxima — o lugar te reconhece',t:0,dur:2.6};
     }
     blip('sine',480,720,.3,.07);
+   }
+   /* v1.6.0: A CHANCE MÍNIMA — TODA entrada numa sala secreta (inclusive
+      revisitas) tem 10% de revelar uma BÊNÇÃO ALEATÓRIA extra. Se a visita
+      já deixou uma bênção no chão, ela não duplica. */
+   if(!pickups.some(function(q){return q.type==='blessing_drop';})&&Math.random()<.10){
+    dropRandomBlessing(game.absMain.x+game.absMain.w/2+rnd(-30,30),game.absMain.y+game.absMain.h*.42+rnd(-18,18));
+    texts.push({x:player.x,y:player.y-56,txt:'algo brilhou entre os escombros...',t:0,life:2,c:'#ffd9a0',size:11,disp:true});
+    blip('sine',760,1140,.25,.08);
    }
    sfx.echo();
   }else if(r.kind==='sacrifice'){
@@ -2753,6 +2821,15 @@ const reg=game.region;
 if(reg==='penumbra'&&game.floor<4){
 if(!game.mapRooms.every(r=>r.cleared||r.isolated))return;
 if(game.portal)return;
+/* v1.6.3: A BÊNÇÃO PRIMEIRO — se a bênção que o chefe derrubou ainda está no
+   chão, o portal NÃO nasce: ele espera você pegá-la. No instante em que a
+   bênção é coletada, o varredor roda de novo e abre o portal na hora. */
+if(pickups.some(q=>q.type==='blessing_drop')){
+if(!game._blessGateHint){game._blessGateHint=true;
+texts.push({x:W/2,y:H*.3,txt:'A BÊNÇÃO AGUARDA — O PORTAL NASCE QUANDO VOCÊ A PEGAR',t:0,life:2.8,c:'#ffd9a0',size:12,disp:true});
+sfx.echo();}
+return;
+}
 const r=game.mapRooms[game.roomIdx];
 if(r)r.hasPortal=true;
 game.portal={x:game.absMain.x+game.absMain.w/2,y:game.absMain.y+game.absMain.h*.42,t:0};
@@ -2784,6 +2861,13 @@ return;
 if(reg==='limbo'&&(game.limboPhase||1)<4){
 if(!game.mapRooms.every(r=>r.cleared||r.isolated))return;
 if(game.portal)return;
+/* v1.6.3: idem no Limbo — a bênção no chão segura o portal */
+if(pickups.some(q=>q.type==='blessing_drop')){
+if(!game._blessGateHint){game._blessGateHint=true;
+texts.push({x:W/2,y:H*.3,txt:'A BÊNÇÃO AGUARDA — O PORTAL NASCE QUANDO VOCÊ A PEGAR',t:0,life:2.8,c:'#ffd9a0',size:12,disp:true});
+sfx.echo();}
+return;
+}
 const r=game.mapRooms[game.roomIdx];
 if(r)r.hasPortal=true;
 game.portal={x:game.absMain.x+game.absMain.w/2,y:game.absMain.y+game.absMain.h*.42,t:0};
@@ -2869,8 +2953,7 @@ else{const inLimbo=game.region==='limbo';label=inLimbo?'ABISMO · DESCIDA ':'PEN
 if(game.region==='penumbra'&&game.floor===3){
  game.banner={type:'circle',txt:'O CHÃO RACHA',name:'PENUMBRA INFERNAL',sub:sub,t:0,dur:4};
 }else if(game.region==='limbo'&&(game.limboPhase||1)===3){
- /* v1.6.1: o limbo...? — o nome da fase é SÓ o nome; tudo cinza, esvaziado */
- game.banner={type:'circle',txt:'...',name:'o limbo...?',sub:sub,t:0,dur:4};
+ game.banner={type:'circle',txt:'O PARAÍSO ESQUENTA',name:'O LIMBO INFERNAL',sub:sub,t:0,dur:4};
 }else{
  game.banner={type:'wave',txt:label,sub:sub,t:0,dur:2.4};
 }
@@ -2880,9 +2963,6 @@ sfx.rumble();
 /* == helper: andar atual usa estética de falso paraíso? == */
 /* v0.9.0: o Limbo (falso paraíso) só é ativado após atravessar o corredor pós-Caronte */
 function isParadiseFloor(){return game.region==='limbo';}
-/* v1.6.1: O LIMBO...? — depois de duas fases o limbo esvazia: tudo cinza,
-   menos inimigos, mais fácil — como se alguém já tivesse passado por aqui */
-function limboCinza(){return game.region==='limbo'&&(game.limboPhase||1)>=3;}
 /* == helper: nível de deformação do paraíso (0=sagrado, 1=estranho, 2=distorcido, 3=perturbador) == */
 function paradiseDistort(){
   if(game.floor<=1)return 0;
@@ -2997,7 +3077,6 @@ function enterLimboOfficial(){
 /* v1.4.5 BLINDAGEM: qualquer caminho que chegue aqui PRECISA sair do estado de
    cutscene — o limbo é um mapa jogável (enterRoom não troca o state). */
 game.state='play';
-boss.active=false;boss.barT=0; /* v1.6.0: a barra do Cérbero nunca chega ao Limbo */
 /* define o andar 4 — ativa a estética do falso paraíso (Limbo) */
 /* v1.3.0: o Limbo começa onde a travessia deixar (run normal: andar 6 —
    escola: andar 4) e dura QUATRO fases (2 do Limbo + 2 do Limbo Infernal) */
@@ -3133,7 +3212,6 @@ if(pp>.65){
 /* === jogador e partículas === */
 drawParticles();
 drawPlayer();
-drawPlayerHitbox(); /* v1.6.2: o ponto vermelho É a hitbox — POR CIMA do corpo */
 drawPistols();/* v1.2.0: as pistolas agora APARECEM (com sprite se houver) */
 drawChainsaw();
 /* === overlay de fade === */
@@ -3164,12 +3242,9 @@ texts.push({x:W/2,y:H*.3,txt:'PENUMBRA — DIRETO AO GUARDIÃO',t:0,life:1.6,c:'
 }
 }
 function beginBossIntro(){
-/* v1.6.1: no LIMBO a sala do chefe NÃO TEM MAIS CHEFE — tem a PLACA DO
-   PRIMEIRO PECADO (ganancia). A intro do Juiz segue intacta no código. */
-if(game.region==='limbo'&&window.__EXPANSION){
-  if(window.__EXPANSION.beginGananciaPlaca){window.__EXPANSION.beginGananciaPlaca();return;}
-  window.__EXPANSION.beginJuizIntro();return;
-}
+/* v1.3.0: no LIMBO a sala extra pertence ao JUIZ SEM ROSTO — o Cérbero
+   mudou para o portão, depois da Penumbra Infernal */
+if(game.region==='limbo'&&window.__EXPANSION){window.__EXPANSION.beginJuizIntro();return;}
 /* v0.9.8: O Observador não é mais um boss normal — apenas invocável na sala de testes */
 game.state='bossintro';game.bossIntroT=0;game.introFlags={};
 game.introFlags.snoreT=1;
@@ -3244,9 +3319,6 @@ function tryInteract(){
   sacrificeAtAltar();
   return;
  }
- /* v1.6.1: a PLACA DO PRIMEIRO PECADO — [Z] lê; [Z] de novo sai da leitura
-    e o buraco da luxuria se abre */
- if(window.__EXPANSION&&window.__EXPANSION.placaInteract&&window.__EXPANSION.placaInteract())return;
  /* NPC da loja — O ERRANTE: v1.1.2 a feira é no CHÃO (chegue perto e [Z]) */
  if(game.shopNear&&(game.state==='play')){
   shopBuy(game.shopNear);
@@ -3277,19 +3349,19 @@ if(!alt||alt.used)return;
    o pacto custa apenas 10 DE VIDA — um beliscão no sangue. Sem sorteio,
    sem engano: sangue no prato, um PACTO no mercurinho. Repetível: depois
    de selar, o altar se rearma e aceita outro sacrifício na mesma sala. */
-const COST=10;
+const COST=30+(alt.uses||0)*10; /* v1.9.0: pactos são mais difíceis — o altar cobra 30 e escala +10 a cada uso na mesma sala */
 if(player.hp<=COST){
-texts.push({x:alt.x,y:alt.y-38,txt:'O ALTAR EXIGE 10 DE VIDA',t:0,life:1.6,c:'#d9465a',size:12,disp:true});
+texts.push({x:alt.x,y:alt.y-38,txt:'O ALTAR EXIGE '+COST+' DE VIDA',t:0,life:1.6,c:'#d9465a',size:12,disp:true});
 texts.push({x:alt.x,y:alt.y-22,txt:'volte com sangue suficiente',t:0,life:1.6,c:'#9c8f7c',size:10,disp:true});
 blip('square',160,80,.2,.07);
 return;
 }
-alt.used=true;alt.cd=.9;
+alt.used=true;alt.cd=.9;alt.uses=(alt.uses||0)+1;
 player.hp-=COST;
 game.flash=.45;game.shake=12;
 sparks(alt.x,alt.y,'#d9465a',26,260,.8,3.5,true);
 sfx.hurt();sfx.echo();
-texts.push({x:alt.x,y:alt.y-30,txt:'-10 DE VIDA SACRIFICADAS',t:0,life:1.5,c:'#d9465a',size:12,disp:true});
+texts.push({x:alt.x,y:alt.y-30,txt:'-'+COST+' DE VIDA SACRIFICADAS',t:0,life:1.5,c:'#d9465a',size:12,disp:true});
 const pactos=UPGRADES.filter(function(u){return PACT_IDS.indexOf(u.id)>=0&&u.can();});
 if(pactos.length){
 const u=pick(pactos);
@@ -3414,8 +3486,9 @@ const ay=(held('down')?1:0)-(held('up')?1:0);
 const l=Math.hypot(ax,ay);
 /* v0.9.13: SHIFT na escola = andar devagar — os passos quase não fazem barulho */
 player.sneak=!!(window.__SCHOOL_ACTIVE&&held('dash')&&player.dashT<=0);
-/* v1.4.6: FOCO — segurar SHIFT mostra a hitbox (um tiro, 5px) e faz o Thor
-   andar devagar (estilo Touhou). Na escola o SHIFT continua sendo o sneak. */
+/* v1.4.6: FOCO — segurar SHIFT mostra a hitbox (4px desde a v1.6.0) e faz o Thor
+   andar devagar (estilo Touhou). Na escola o SHIFT continua sendo o sneak.
+   O ponto carmesim só existe com SHIFT pressionado — soltou, some. */
 player.focus=!!(held('dash')&&!window.__SCHOOL_ACTIVE&&player.dashT<=0);
 const spd=285*P.speedMult*(player.slowT>0?.55:1)*(player.sneak?.5:1)*(player.focus?.42:1);
 if(l){
@@ -3467,28 +3540,20 @@ break;
 }
 player.inv-=dt;
 if(game.meleeHitT>0)game.meleeHitT-=dt;
-/* v0.9.6: FOME INSCIÁVEL — perde 5 HP a cada 10 segundos */
+/* v0.9.6: FOME INSCIÁVEL — v1.9.0: a fome agora consome ALMAS, nunca vida
+   (drenagem passiva de HP removida do jogo por completo) */
 if(game.endlessHunger&&!player.dead){
   game.hungerT=(game.hungerT||0)+dt;
   if(game.hungerT>=10){
     game.hungerT=0;
-    player.hp=Math.max(1,player.hp-5);
-    sparks(player.x,player.y,'#a8c24f',6,160,.4,2.5,true);
-    texts.push({x:player.x,y:player.y-25,txt:'-5 (fome)',t:0,life:.8,c:'#a8c24f',size:11,disp:true});
-    if(player.hp<=1){hurtPlayer();}
+    const _fome=Math.min(5,META.souls|0);
+    if(_fome>0){META.souls-=_fome;sparks(player.x,player.y,'#a8c24f',6,160,.4,2.5,true);
+    texts.push({x:player.x,y:player.y-25,txt:'-'+_fome+' almas (fome)',t:0,life:.8,c:'#a8c24f',size:11,disp:true});}
+    else {texts.push({x:player.x,y:player.y-25,txt:'a fome rangendo de vazio...',t:0,life:.8,c:'#a8c24f',size:10,disp:true});}
   }
 }
-/* v0.9.6: PACTO DA FOME — perde 5 HP por segundo (drena continuamente) */
-if(game.fomeDrain&&!player.dead){
-  player.hp-=5*dt;
-  if(Math.random()<dt*4)particles.push({x:player.x+rnd(-8,8),y:player.y+rnd(-8,8),vx:rnd(-15,15),vy:rnd(-30,-10),life:.4,t:0,r:rnd(1,2),c:'#a8c24f',drag:1,glow:true});
-  if(player.hp<=0){
-    player.hp=0;player.dead=true;game.state='dead';game.deadT=0;game.overlayShown=false;
-    game.deadTaunt=window.__DEATH_PICK?window.__DEATH_PICK():pick(DEATH_TAUNTS); /* v1.3.0 */
-    META.deaths++;saveMeta();
-    game.shake=18;sfx.die();
-  }
-}
+/* v0.9.6: PACTO DA FOME — v1.9.0: a drenagem de 5 HP/s FOI REMOVIDA.
+   A contrapartida agora é dano recebido +25% (tratado no grimório). */
 }
 /* PARRY (GUARDA PROFANA): só funciona com armas de curta distância.
    Nada de segurar espaço — basta a hitbox do golpe (mordida, serra, lâmina)
@@ -3573,6 +3638,7 @@ if(game.up.espelho&&Math.random()<0.15){
   sparks(player.x,player.y,'#ff0000',8,200,.4,3,true);
 }
 if(window.__RM)dmg=window.__RM.hurtDmg(dmg); /* v1.4.0 */
+if(window.__GRI)dmg=window.__GRI.hurtDmg(dmg); /* v1.9.0: contrapeso, pele de sal, contratos do grimório */
 player.hp-=dmg;player.inv=1.15+P.invBonus;game.hurtV=1;game.shake=Math.max(game.shake,14);
 if(window.__EXPANSION)window.__EXPANSION.afterHurt(); /* v1.3.0 */
 /* v1.1.0: SENTENÇA DA IRA — ferido, a fúria detona em chamas */
@@ -3731,6 +3797,33 @@ if(h.hp<=0)killHead(h);
 }
 sparks(x,y,'#ff8f3d',8,200,.4,3,true);sparks(x,y,'#ffd9a0',4,260,.3,2,true);
 game.shake=Math.max(game.shake,3);sfx.boom();
+/* v1.6.0: EXPLOSIVO × PORTA TRANCADA — bomba (PORTA DAS SOMBRAS), tiro
+   explosivo (PÓLVORA) e FAGULHA [Q] quebram portas FECHADAS por inimigos
+   (sala de combate/desafio varrida pela metade) ou por enigma (puzzle não
+   resolvido): a explosão destrói a porta e libera a saída. NÃO funciona
+   em sala de CHEFE, MINI-CHEFE ou chefe secreto — essas trancas são
+   sagradas. A porta destruída NASCE aberta se você voltar depois. */
+if(!game.futureBossMode&&game.state==='play'){
+const rk=game.mapRooms[game.roomIdx];
+const blastOK=rk&&(rk.kind==='combat'||rk.kind==='challenge'||(rk.kind==='puzzle'&&game.puzzle&&game.puzzle.lock&&!game.puzzle.solved));
+if(blastOK){
+for(const d of game.doors){
+if(d.open||d.hidden)continue;
+if(dist(x,y,d.x,d.y)<r+26){
+d.open=true;d.broken=true;
+rk.doorBlown=rk.doorBlown||{};rk.doorBlown[d.dir]=true;
+sparks(d.x,d.y,'#ff8f3d',22,320,.75,4,true);
+sparks(d.x,d.y,'#ffd9a0',12,240,.6,3.5,true);
+shockwaves.push({x:d.x,y:d.y,r:0,vr:640,maxR:120,t:0,dur:.45,c:'#ff8f3d'});
+game.shake=Math.max(game.shake,12);game.flash=Math.max(game.flash,.25);
+sfx.gate();sfx.boom();
+texts.push({x:d.x,y:d.y-28,txt:'A PORTA EXPLODIU',t:0,life:1.6,c:'#ff8f3d',size:12,disp:true});
+game.banner={type:'small',txt:'A PORTA EXPLODIU',sub:'os escombros liberam a passagem',t:0,dur:2};
+break;
+}
+}
+}
+}
 }
 /* ============ modo tiro (MANUAL — clique esquerdo / setas; automático só com o OLHO DO CAÇADOR) ============ */
 const mouse={x:W/2,y:H*.4,inCanvas:false};
@@ -4072,21 +4165,6 @@ if(game.hasPistols)firePistols(a);
 if(game.hasBite&&arrowShotT<=0){tryBite(a);arrowShotT=.12;}
 return;
 }
-/* v1.6.1: o botão do mouse ATIRA COMO AS TECLAS — segurar = segurar seta:
-   mesma cadência, mesmo comportamento, mira seguindo o cursor */
-if(!sx&&!sy&&mouseHeld&&mouse.inCanvas){
- const a=Math.atan2(mouse.y-player.y,mouse.x-player.x);
- player.angle=a;
- if(game.hasBeam){
-  if(!game.beamCharging)firePistols(a);
-  game.beamCharging=true;game.beamA=a;
- }else{
-  if(game.hasShot)fireShot(a);
-  if(game.hasPistols)firePistols(a);
- }
- if(game.hasBite&&arrowShotT<=0){tryBite(a);arrowShotT=.12;}
- return;
-}
 /* tiro automático — somente com a bênção rara OLHO DO CAÇADOR */
 if(game.autoFire&&game.hasShot&&!game.beamCharging){
 const reach=470*P.reachMult;
@@ -4202,6 +4280,7 @@ if(b.bleed){e.burnT=3;e.burnD=4*P.dmgMult;sparks(e.x,e.y,'#d9465a',4,120,.35,2.5
 /* v0.9.6: Lágrimas — tiros de lágrima causam lentidão */
 if(b.tear||b.slowShot){e.slowT=Math.max(e.slowT,1.5);sparks(e.x,e.y,'#9fd8ff',4,120,.35,2.5,true);}
 if(b.elem)applyElem({kind:'enemy',obj:e},b.elem,b.dmg);
+if(window.__GRI)window.__GRI.playerHit(e,b); /* v1.9.0: ganchos do grimório (marcas, dente do veredito, sinergias) */
 /* v1.1.0: FAGULHA EXPLOSIVA — o tiro que detona: estoura em área ao ferir */
 if(b.fag&&!b._fagBoom){b._fagBoom=true;explodeAt(b.x,b.y,74,26*P.dmgMult);sparks(b.x,b.y,'#ffd9a0',12,240,.5,3,true);}
 if(e.hp<=0)killEnemy(e);
@@ -4708,29 +4787,25 @@ if(t.obj.hp<=0)killEnemy(t.obj);
 function buildRoomQueue(kind){
 const q=[];
 const f=clamp(game.floor,1,5);
-/* v1.6.1: O LIMBO...? — depois de duas fases o limbo ESVAZIA: menos inimigos,
-   tipos fracos, como se alguém já tivesse passado e levado tudo */
-const cinza=limboCinza();
 const pools={
 1:[['sh',5],['al',3],['br',1],['sp',2],['cr',1]],
 2:[['sh',3],['al',2],['sp',3],['fs',2],['br',1],['es',1],['cr',2],['vg',1]], /* v1.5.1: o MORCEGO FLAMEJANTE só caça a partir da PENUMBRA INFERNAL (andar 3+) */
 3:[['sh',2],['sp',3],['fs',2],['ru',2],['ce',1],['al',2],['es',1],['la',1],['br',1],['cr',2],['vg',1],['fa',1],['mf',2]],
 4:[['sh',2],['sp',3],['fs',3],['ru',2],['ce',2],['gd',1],['es',1],['la',1],['al',1],['cr',2],['vg',1],['fa',1],['pg',1],['mf',2]],
 5:[['sh',2],['sp',3],['fs',3],['ru',3],['ce',2],['gd',2],['es',2],['la',2],['cr',2],['vg',1],['fa',1],['pg',1],['mf',2]]};
-const pool=cinza?pools[2]:((kind==='challenge'&&game.floor>=2)?pools[Math.min(5,f+1)]:pools[f]);
+const pool=(kind==='challenge'&&game.floor>=2)?pools[Math.min(5,f+1)]:pools[f];
 /* v0.9.1: menos inimigos por sala no começo */
 let count=4+f*2+irnd(0,2);
 /* v0.9.9: desafio escala MUITO por andar — mais inimigos, tipos mais duros e
    vida inflada (ver spawnEnemy). é a fonte do item do andar. */
 if(kind==='challenge')count=Math.min(34,Math.round(count*(1.55+.18*(game.floor-1))));
 if(game.hard)count=Math.round(count*1.2);
-if(cinza)count=Math.max(3,Math.round(count*.42)); /* v1.6.1: incomumente vazio */
 for(let i=0;i<count;i++){
 let tot=0;for(const p of pool)tot+=p[1];
 let r=rnd(tot);
 for(const p of pool){r-=p[1];if(r<=0){q.push(p[0]);break;}}
 }
-if(game.hard&&!cinza){ /* v1.6.1: o limbo...? não escala tipos */
+if(game.hard){
 for(let i=0;i<q.length;i++){
 const t=q[i];
 if(t==='sh'&&Math.random()<.5)q[i]='sp';
@@ -4877,23 +4952,23 @@ crE:['ENXAME ABISSAL','quando se divide, são três fomes em vez de duas.']
 };
 /* ============ inimigos ============ */
 /* v0.9.16: KAIZO é um TÍTULO, não o nome — "KAIZO — [nome real do boss]" */
-function miniDisplayName(t,kaizo,neo){return (neo&&kaizo)?('NEO KAIZO — '+(MINI_NAMES[t]||'MINI-CHEFE')):neo?('NEO — '+(MINI_NAMES[t]||'MINI-CHEFE')):kaizo?('KAIZO — '+(MINI_NAMES[t]||'MINI-CHEFE')):(MINI_NAMES[t]||'MINI-CHEFE');} /* v1.6.2: boss que REPETE no MODO KAIZO = NEO KAIZO (pedido) */
+function miniDisplayName(t,kaizo,neo){return neo?('NEO — '+(MINI_NAMES[t]||'MINI-CHEFE')):kaizo?('KAIZO — '+(MINI_NAMES[t]||'MINI-CHEFE')):(MINI_NAMES[t]||'MINI-CHEFE');}
 function miniDisplayColor(t,kaizo,neo){return(neo||kaizo)?'#eef2f4':(MINI_COLORS[t]||'#cfd8dc');}
-function spawnMarkAt(type,x,y,big,kaizo){
+function spawnMarkAt(type,x,y,big,kaizo,hpMul){
 if(x===undefined){
 const m=game.absMain;
 x=lerp(m.x+70,m.x+m.w-70,Math.random());
 y=lerp(m.y+70,m.y+m.h-70,Math.random());
 }
 const p=roomPt(x,y,36);
-spawnMarks.push({x:p.x,y:p.y,type:type,t:0,dur:big?1.2:.75,big:big,kaizo:!!kaizo});
+spawnMarks.push({x:p.x,y:p.y,type:type,t:0,dur:big?1.2:.75,big:big,kaizo:!!kaizo,_hpMul:hpMul||1});
 }
-function spawnEnemy(type,x,y,kaizo){
+function spawnEnemy(type,x,y,kaizo,hpMul){
 const c=game.threat;
 if(!META.seen[type]){META.seen[type]=1;saveMeta();}
 const e={x:x,y:y,type:type,flash:0,spawnT:0,ang:rnd(TAU),seed:rnd(10),hitT:0,dead:false,slowT:0,burnT:0,poisT:0,poisD:0,poisStack:0,burnD:0};
 /* v0.9.1: inimigos normais do começo com menos vida e spawn */
-if(type==='sh'){e.r=13;e.hp=7+c*2;e.sp=(game.hard?132:118)+c*4;}
+if(type==='sh'){e.r=13;e.hp=7+c*2;e.sp=(game.hard?124:112)+c*4;} /* v1.9.0: menos velocidade bruta */
 else if(type==='br'){e.r=24;e.hp=38+c*6;e.sp=(game.hard?64:55)+c*2;}
 else if(type==='sp'){e.r=12;e.hp=11+c*2;e.sp=game.hard?95:82;e.shootT=rnd(1.4,2.6);e.charge=0;e.burst=0;}
 else if(type==='fs'){e.r=13;e.hp=14+c*2;e.sp=game.hard?80:70;e.shootT=rnd(1.6,2.8);e.charge=0;e.burst=0;}
@@ -4903,8 +4978,8 @@ else if(type==='gd'){e.r=26;e.hp=50+c*6;e.sp=game.hard?46:38;}
 else if(type==='al'){e.r=9;e.hp=6+c;e.sp=58+c*3;}
 else if(type==='es'){e.r=15;e.hp=20+c*4;e.sp=44;e.tpT=rnd(2.2,3.6);}
 else if(type==='la'){e.r=13;e.hp=17+c*3;e.sp=34;e.cryT=rnd(1.8,3);}
-else if(type==='cr'){e.r=13;e.hp=8+c*2;e.sp=(game.hard?152:136)+c*2;}
-else if(type==='crs'){e.r=7;e.hp=4+c;e.sp=(game.hard?190:168)+c*2;}
+else if(type==='cr'){e.r=13;e.hp=8+c*2;e.sp=(game.hard?136:124)+c*2;} /* v1.9.0: perseguidores menos velozes, mais legíveis */
+else if(type==='crs'){e.r=7;e.hp=4+c;e.sp=(game.hard?168:150)+c*2;} /* v1.9.0: os menores também respiram */
 else if(type==='vg'){e.r=14;e.hp=18+c*3;e.sp=30;e.aimT=rnd(1.5,2.5);e.aimA=0;}
 else if(type==='pg'){e.r=20;e.hp=55+c*7;e.sp=22;e.pulseT=rnd(2,3.2);}
 else if(type==='fa'){e.r=12;e.hp=13+c*2;e.sp=60;e.restT=0;e.dashT=0;e.dashA=0;}
@@ -4988,6 +5063,8 @@ if(e.maxHp)e.maxHp=e.hp;
 if(e.atkT)e.atkT*=.72;
 if(e._neo){e.hp=Math.round(e.hp*1.15);if(e.maxHp)e.maxHp=e.hp;e.sp=Math.round(e.sp*1.1);if(e.atkT)e.atkT*=.55;}
 }
+/* v1.6.4: A CORTE DUPLA — o gêmeo nasce com 80% da vida (dois senhores na mesma arena) */
+if(hpMul&&e.hp){e.hp=Math.max(1,Math.round(e.hp*hpMul));if(e.maxHp)e.maxHp=e.hp;}
 /* ==== v0.9.13: VARIAÇÕES DE INIMIGOS (elites) — mais bullet hell nos círculos.
    Elites entram no bestiário com chave tipo+'E', disparam mais rápido
    (timers menores) e têm vida/velocidade/tamanho maiores. ==== */
@@ -5040,7 +5117,7 @@ function dropRandomBlessing(x,y,curve){
   const roll=Math.random()*(window.__RM_lieBias?window.__RM_lieBias():1); /* v1.4.0: FAVOR DA MENTIRA */
   const T=curve==='peito'?[.40,.72,.92]:[.50,.80,.95];
   let dropType,dropId,rarity;
-  const tryTier=(minQ,maxQ)=>{const pool=UPGRADES.filter(u=>u.q>=minQ&&u.q<=maxQ&&u.can());if(pool.length){const u=pick(pool);dropType='upgrade';dropId=u.id;rarity=minQ>=5?'épico':minQ>=3?'raro':'comum';return true;}return false;};
+  const tryTier=(minQ,maxQ)=>{const pool=UPGRADES.filter(u=>u.q>=minQ&&u.q<=maxQ&&u.can());if(pool.length){let _pl=window.__GRI&&window.__GRI.dropOk?pool.filter(u=>window.__GRI.dropOk(u,minQ)):pool;const u=pick(_pl.length?_pl:pool);dropType='upgrade';dropId=u.id;rarity=minQ>=5?'épico':minQ>=3?'raro':'comum';return true;}return false;}; /* v1.9.0: pactos raros no chão, feixes só no épico+ */
   if(roll<T[0]){
     /* comum (q1-2) */
     if(!tryTier(1,2))tryTier(3,4)||tryTier(5,6);
@@ -5092,6 +5169,7 @@ if(game.sinGulaK>=15&&(game.sinGulaHp||0)<75){game.sinGulaK=0;game.sinGulaHp=(ga
 if(game.sinInvidia)gainSouls(3);
 e.dead=true;game.kills++;META.kills++;conqTick();
 if(window.__EXPANSION)window.__EXPANSION.onKill(e); /* v1.3.0 */
+if(window.__GRI)window.__GRI.onKill(e); /* v1.9.0: O GRIMÓRIO DAS CEM ALMAS */
 /* v0.9.16: contagem de KAIZO para conquistas */
 if(e.kaizo){game.kaizoKills++;META.kaizoKills=(META.kaizoKills||0)+1;saveMeta();}
 /* ===== v0.9.16: ESPECIALIZAÇÕES — efeitos no momento do abate ===== */
@@ -5735,6 +5813,7 @@ resolveDecorCollision(e,e.r);
 clampArena(e,e.r);
 if(!player.dead&&d<e.r+(player.hitR||player.r)-4){ /* v1.4.6 hitR */
 hurtPlayer();
+if(window.__GRI)window.__GRI.contactHit(e); /* v1.9.0: contato aplica efeitos (coroa de espinhos, queimadura, veneno) */
 e.x-=Math.cos(a)*26;e.y-=Math.sin(a)*26;
 }
 }
@@ -5757,35 +5836,6 @@ const MB_HARD_PATS=['shotgun','rings','bothwalls','twin'];
    ele é KAIZO (repetido). É isso que faz o kaizo ser o boss do hardmode no normal. */
 const kzH=e=>game.hard||!!(e&&e.kaizo);
 const mbPats=e=>kzH(e)?MB_PATS.concat(MB_HARD_PATS):MB_PATS;
-/* ============ v1.6.2: TODOS OS BOSSES KAIZO COMO O BRUXO ============
-   O bruxo tinha o pacote completo (FASE II aos 50%, padrões exclusivos com
-   peso maior, combos encadeados, cadência frenética) — o carrasco, a viúva
-   e o golem tinham só o ciclo antigo. Agora os três compartilham o MESMO
-   motor do bruxo: kzPhase2 (o despertar) + kzBossEnd (o encadeamento). */
-function kzPhase2(e){
-if(e.kaizo&&!e.kzP2&&e.hp<=e.maxHp*.5&&!e.dead){
-e.kzP2=true;
-game.flash=.5;game.shake=16;game.hitstop=.14;
-sfx.roar();sfx.growl();
-for(const b of ebullets)sparks(b.x,b.y,'#eef2f4',3,120,.4,2,true);
-ebullets=[];
-sparks(e.x,e.y,'#eef2f4',40,420,1.1,5,true);
-texts.push({x:e.x,y:e.y-e.r-24,txt:'FASE II',t:0,life:1.6,c:'#eef2f4',size:16,disp:true});
-game.banner={type:'small',txt:miniDisplayName(e.type,true,e._neo)+' — FASE II',sub:'a forma branca desperta',t:0,dur:2.2};
-e.sp*=1.15;
-}
-}
-function kzBossEnd(e,baseCd){
-e.st='float';e.stT=0;
-/* v0.9.16→v1.6.2: encadeia outro padrão logo (combos anti-decoração) — 45%, NEO 55% */
-if(e.kaizo&&(e.kzP2||e._neo)&&Math.random()<(e._neo?.55:.45)&&!e._chained){
-e._chained=true;e.st='tele';e.stT=0;sfx.growl();return;
-}
-e._chained=false;
-/* v1.6.2: cadência FRENÉTICA no kaizo (.55s) — o modo kaizo é um bullet hell */
-e.atkT=e.kaizo?((.55+rnd(.3))*(e.kzP2?.72:1)):baseCd;
-if(e._neo)e.atkT*=.5;
-}
 function miniBossAI(e,dt,a,d,slowMul){
 e.stT+=dt;
 /* v0.9.16: KAIZO FASE II — aos 50% de vida o boss desperta: mais rápido,
@@ -5798,7 +5848,7 @@ for(const b of ebullets)sparks(b.x,b.y,'#eef2f4',3,120,.4,2,true);
 ebullets=[];
 sparks(e.x,e.y,'#eef2f4',40,420,1.1,5,true);
 texts.push({x:e.x,y:e.y-e.r-24,txt:'FASE II',t:0,life:1.6,c:'#eef2f4',size:16,disp:true});
-game.banner={type:'small',txt:miniDisplayName(e.type,true,e._neo)+' — FASE II',sub:'a forma branca desperta',t:0,dur:2.2};
+game.banner={type:'small',txt:miniDisplayName(e.type,true,e._neo)+' — FASE II',sub:({mb:'os feitiços encadeiam em sequências geométricas',ex:'as investidas voltam em cadeia',vi:'os fios da morte tensionam o campo',gz:'o chão queimado fica perigoso'})[e.type]||'a forma branca desperta',t:0,dur:2.2};
 e.sp*=1.15;
 }
 if(e.st==='float'){
@@ -5809,16 +5859,25 @@ e.ang=lerpAngle(e.ang,a,1-Math.exp(-3*dt));
 e.atkT-=dt;
 if(e.atkT<=0){
 /* v0.9.16: KAIZO sorteia também entre os padrões EXCLUSIVOS do boss
-   (peso maior na Fase II); não-kaizo mantém o ciclo antigo intacto */
+   (peso maior na Fase II); não-kaizo mantém o ciclo antigo intacto.
+   v1.6.3: na Fase II o FEITIÇO ASSINATURA do boss (Grimório Rasgado,
+   Investida Ricochete, Fios da Morte, Maré de Magma) domina o sorteio. */
 if(e.kaizo){
+/* v1.7.0: EDITOR DE MODS — a spell card vinculada ao chefe substitui o sorteio */
+if(window.__MODS&&__MODS.on()&&__MODS.spellFor(e.type)){e.pat='kz_mod';}
+else{
 const ex=_kzPatsMap[e.type]||[];
 const base=mbPats(e);
 const exW=e.kzP2?.62:.4;
 e.pat=Math.random()<exW&&ex.length?ex[irnd(0,ex.length-1)]:base[irnd(0,base.length-1)];
+if(e.kzP2&&_kzSignature[e.type]&&Math.random()<.45)e.pat=_kzSignature[e.type];
+}
 }else{
 const pats=mbPats(e);
 e.patIdx=(e.patIdx+1)%pats.length;e.pat=pats[e.patIdx];
 }
+/* v1.7.1: EDITOR DE MODS — substituição de padrão (spell do mod / padrão do mod) */
+if(window.__MODS&&__MODS.on()&&e.pat!=='kz_mod'){const _ms=__MODS.takeover(e.type,e.pat);if(_ms){e._modSpell=_ms;e.pat='kz_mod';}}
 e.st='tele';e.stT=0;sfx.growl();
 /* telegráfo do cast — o jogador VÊ que algo vem (justo e previsível) */
 if(e.kaizo)kzTeleMark(e);
@@ -5831,6 +5890,8 @@ clampArena(e,e.r);
 if(!player.dead&&d<e.r+(player.hitR||player.r)-4)hurtPlayer();
 }
 function mbActStart(e){
+/* v1.7.0: EDITOR DE MODS — despacho da spell card do mod */
+if(e.pat==='kz_mod'&&window.__MODS){__MODS.spellStart(e);return;}
 /* v0.9.16: padrões exclusivos KAIZO — despachados por tipo de boss */
 if(e.pat&&e.pat.indexOf('kz_')===0){(_kzStartMap[e.type]||function(){})(e);return;}
 if(e.pat==='spiral')e.data={spin:rnd(TAU),tick:0,dur:kzH(e)?3.4:2.6};
@@ -5861,7 +5922,7 @@ if(e.kaizo&&(e.kzP2||e._neo)&&Math.random()<(e._neo?.55:.45)&&!e._chained){
   return;
 }
 e._chained=false;
-e.atkT=kzH(e)?(.55+rnd(.3))*(e.kzP2?.72:1):1.6+rnd(.6);
+e.atkT=kzH(e)?(.42+rnd(.26))*(e.kzP2?.72:1):1.6+rnd(.6); /* v1.6.4: kaizo volta ao ataque 24% mais rápido */
 if(e._neo)e.atkT*=.5;
 }
 /* ============================================================
@@ -5885,31 +5946,35 @@ telegraphs.push({x:e.x,y:e.y,r:e.r+16,t:0,dur:Math.max(.5,e.stT||.5),c:'#eef2f4'
 }
 /* ---- O BRUXO: sigilos, espelhos, cometas ---- */
 function kzActStart(e){
+/* v1.7.0: EDITOR DE MODS — despacho da spell card do mod */
+if(e.pat==='kz_mod'&&window.__MODS){__MODS.spellStart(e);return;}
 if(e.pat==='kz_runes'){e.data={cast:0,shots:0};}
 else if(e.pat==='kz_mirrors'){e.data={t:0,fired:0};kzWarn(e.x,e.y,e.r+20,.6,null,'#c9a0ff');}
 else if(e.pat==='kz_comets'){e.data={wave:0,waveT:.35};}
-else if(e.pat==='kz_pacto'){e.data={w:0,wt:.3};kzWarn(e.x,e.y,e.r+18,.5,null,'#c9a0ff');} /* v1.6.2 */
+else if(e.pat==='kz_grimoire'){e.data={t:0,stage:0};texts.push({x:e.x,y:e.y-e.r-30,txt:'SPELL CARD — GRIMÓRIO RASGADO',t:0,life:1.5,c:'#c9a0ff',size:12,disp:true});}
 }
 function kzActUpdate(e,dt){
 const kz2=e.kzP2;
+/* v1.7.0: EDITOR DE MODS — despacho da spell card do mod */
+if(e.pat==='kz_mod'&&window.__MODS){__MODS.spellUpdate(e,dt);return;}
 if(e.pat==='kz_runes'){
   /* SIGILOS DA PENUMBRA — 4 (6 na fase II) sigilos nascem perto do jogador e detonam */
   e.data.cast+=dt;
-  if(e.data.shots<(kz2?6:4)&&e.data.cast>.22){
+  if(e.data.shots<(kz2?9:6)&&e.data.cast>.2){ /* v1.6.4: 9/6 sigilos (era 6/4) */
     e.data.cast=0;e.data.shots++;
     const a=rnd(TAU),d=rnd(60,150);
     const rx=clamp(player.x+Math.cos(a)*d,ROOM.x+40,ROOM.x+ROOM.w-40);
     const ry=clamp(player.y+Math.sin(a)*d,ROOM.y+40,ROOM.y+ROOM.h-40);
     kzWarn(rx,ry,64,.95,function(){
       kzDetonate(rx,ry,64,26,'#c9a0ff');
-      for(let k=0;k<6;k++){
-        const ba=k/6*TAU+rnd(.4);
-        ebullets.push({x:rx,y:ry,vx:Math.cos(ba)*200,vy:Math.sin(ba)*200,r:5,c:'#c9a0ff'});
+      for(let k=0;k<8;k++){ /* v1.6.4: 8 estilhaços por sigilo (era 6) */
+        const ba=k/8*TAU+rnd(.4);
+        ebullets.push({x:rx,y:ry,vx:Math.cos(ba)*240,vy:Math.sin(ba)*240,r:5,c:'#c9a0ff'});
       }
     },'#c9a0ff');
     blip('square',520,240,.14,.09);
   }
-  if(e.data.shots>=(kz2?6:4)&&e.data.cast>1.1)mbEnd(e);
+  if(e.data.shots>=(kz2?9:6)&&e.data.cast>1.1)mbEnd(e);
 }else if(e.pat==='kz_mirrors'){
   /* ESPELHOS DO BRUXO — 2 fantasmas disparam leques e se desfazem */
   e.data.t+=dt;
@@ -5918,10 +5983,10 @@ if(e.pat==='kz_runes'){
     for(let g=0;g<2;g++){
       const gx=clamp(e.x+(g?1:-1)*120,ROOM.x+40,ROOM.x+ROOM.w-40);
       const gy=e.y;
-      const base=Math.atan2(player.y-gy,player.x-gx),n=kz2?5:3;
+      const base=Math.atan2(player.y-gy,player.x-gx),n=kz2?7:5; /* v1.6.4: leque maior */
       for(let i=0;i<n;i++){
-        const ba=base+(i-(n-1)/2)*.22;
-        ebullets.push({x:gx,y:gy,vx:Math.cos(ba)*230,vy:Math.sin(ba)*230,r:5,c:'#c9a0ff'});
+        const ba=base+(i-(n-1)/2)*.19;
+        ebullets.push({x:gx,y:gy,vx:Math.cos(ba)*270,vy:Math.sin(ba)*270,r:5,c:'#c9a0ff'});
       }
       sparks(gx,gy,'#c9a0ff',14,220,.6,4,true);
     }
@@ -5931,63 +5996,86 @@ if(e.pat==='kz_runes'){
 }else if(e.pat==='kz_comets'){
   /* COMETAS — 3 (4) vagas de projéteis que perseguem levemente (homing fraco) */
   e.data.waveT-=dt;
-  if(e.data.waveT<=0&&e.data.wave<(kz2?4:3)){
-    e.data.wave++;e.data.waveT=.55;
-    for(let k=0;k<3;k++){
-      const a=e.data.wave*1.1+k*2.1+e.seed;
+  if(e.data.waveT<=0&&e.data.wave<(kz2?6:4)){ /* v1.6.4: 6/4 vagas (era 4/3) */
+    e.data.wave++;e.data.waveT=.42;
+    for(let k=0;k<4;k++){ /* v1.6.4: 4 cometas por vaga (era 3) */
+      const a=e.data.wave*.95+k*1.57+e.seed;
       /* home/homeT: perseguição fraca e CURTA (2s) — dá para despistar */
-      ebullets.push({x:e.x,y:e.y,vx:Math.cos(a)*170,vy:Math.sin(a)*170,r:6,c:'#eef2f4',home:1.1,homeT:2.2,life:4.2});
+      ebullets.push({x:e.x,y:e.y,vx:Math.cos(a)*205,vy:Math.sin(a)*205,r:6,c:'#eef2f4',home:1.1,homeT:2.2,life:4.2});
     }
     sfx.spit();blip('sine',300,140,.3,.12);
   }
-  if(e.data.wave>=(kz2?4:3)&&e.data.waveT<=-.3)mbEnd(e);
-}else if(e.pat==='kz_pacto'){
-  /* v1.6.2: O PACTO — leques duplos mirando você com um anel lento fechando o cerco */
-  e.data.wt-=dt;
-  if(e.data.wt<=0&&e.data.w<(kz2?4:3)){
-    e.data.w++;e.data.wt=.42;
-    const base=Math.atan2(player.y-e.y,player.x-e.x),n=kz2?7:5;
-    for(let i=0;i<n;i++){
-      const a=base+(i-(n-1)/2)*.19;
-      ebullets.push({x:e.x,y:e.y,vx:Math.cos(a)*250,vy:Math.sin(a)*250,r:5,c:'#c9a0ff'});
+  if(e.data.wave>=(kz2?6:4)&&e.data.waveT<=-.3)mbEnd(e);
+}else if(e.pat==='kz_grimoire'){
+  /* ===== v1.6.3: GRIMÓRIO RASGADO (feitiço assinatura do Bruxo) =====
+     O Bruxo rasga o grimório: linhas mágicas ATRAVESSAM a arena, cada uma
+     pisca em roxo e cospe uma FILEIRA de projéteis perpendicular à linha.
+     Sempre existe rota segura: cada fileira tem uma brecha de 2 vagas.
+     FASE II: o feitiço vira LEITURA DUPLA — primeiro as linhas HORIZONTAIS,
+     depois as DIAGONAIS, e a segunda sequência tem aviso visual PRÓPRIO
+     (magenta claro). Raciocínio espacial: observar o sinal e atravessar a
+     linha antes dela disparar. */
+  e.data.t+=dt;
+  const stages=kz2?2:1;
+  if(e.data.stage<stages&&e.data.t>.3){
+    e.data.t=0;e.data.stage++;
+    const diag=e.data.stage===2; /* 2ª leitura = diagonal (só na Fase II) */
+    const ang=diag?(Math.random()<.5?Math.PI/4:-Math.PI/4):0;
+    const col=diag?'#ff9ff3':'#c9a0ff'; /* aviso visual próprio da 2ª leitura */
+    for(let i=0;i<3;i++){
+      const off=(i+1)/4;
+      const cy=ROOM.y+40+off*(ROOM.h-80),cx=ROOM.x+ROOM.w/2;
+      const perp=ang+Math.PI/2; /* a fileira avança perpendicular à linha */
+      kzWarn(cx,cy,0,diag?.8:1.0,function(){
+        const n=15,gap=irnd(1,n-3); /* brecha de 2 vagas — rota garantida · v1.6.4: fileira de 15 (era 13) */
+        const step=(ROOM.w*.92)/(n-1);
+        for(let k=0;k<n;k++){
+          if(k===gap||k===gap+1)continue;
+          const px=clamp(cx+Math.cos(ang)*step*(k-(n-1)/2),ROOM.x+14,ROOM.x+ROOM.w-14);
+          const py=clamp(cy+Math.sin(ang)*step*(k-(n-1)/2),ROOM.y+14,ROOM.y+ROOM.h-14);
+          ebullets.push({x:px,y:py,vx:Math.cos(perp)*(diag?280:250),vy:Math.sin(perp)*(diag?280:250),r:5,c:col}); /* v1.6.4: mais rápidas */
+        }
+        sfx.spit();blip('square',diag?480:420,180,.2,.1);
+      },col,'line',ang);
     }
-    if(ebullets.length<400){
-      const n2=14,g=irnd(0,n2-1);
-      for(let i=0;i<n2;i++){
-        if(i===g||i===(g+1)%n2)continue;
-        const a=i/n2*TAU+e.data.w*.3;
-        ebullets.push({x:e.x,y:e.y,vx:Math.cos(a)*120,vy:Math.sin(a)*120,r:5,c:'#eef2f4'});
-      }
-    }
-    sfx.spit();
+    sfx.growl();blip('sine',240,110,.5,.12);
   }
-  if(e.data.w>=(kz2?4:3)&&e.data.wt<=-.4)mbEnd(e);
+  if(e.data.stage>=stages&&e.data.t>1.6)mbEnd(e);
 }
 }
 /* ---- O CARRASCO: guilhotinas, corrente, execução ---- */
 function kzActStartEx(e){
+const kz2=e.kzP2; /* v1.6.3: os cards novos usam a fase no Start */
+/* v1.7.0: EDITOR DE MODS — despacho da spell card do mod */
+if(e.pat==='kz_mod'&&window.__MODS){__MODS.spellStart(e);return;}
 if(e.pat==='kz_guillotine'){e.data={lockX:player.x,t:0,done:0};}
 else if(e.pat==='kz_chain'){e.data={spin:rnd(TAU),t:0};}
 else if(e.pat==='kz_execute'){e.data={cx:player.x,cy:player.y,t:0,fired:0};}
-else if(e.pat==='kz_ferro'){e.data={rows:0,t:.2};} /* v1.6.2 */
+else if(e.pat==='kz_ricochet'){e.data={t:0,phase:'aim',charges:0,max:kz2?3:2,aimed:false,lastA:null,aimA:0};texts.push({x:e.x,y:e.y-e.r-30,txt:'SPELL CARD — INVESTIDA RICOCHETE',t:0,life:1.5,c:'#e8455a',size:12,disp:true});}
+/* v1.6.4: AVANÇO TRIPLO — três investidas marcadas; a 3ª termina com o GOLPE DA PÁ de perto */
+else if(e.pat==='kz_avanco'){e.data={t:0,phase:'aim',charges:0,max:3,aimed:false,lastA:null,aimA:0};texts.push({x:e.x,y:e.y-e.r-30,txt:'SPELL CARD — AVANÇO TRIPLO',t:0,life:1.5,c:'#e8455a',size:12,disp:true});}
+/* v1.6.4: ENXAME VAMPIRO — morcegos que perseguem o Thor; CADA morcego que acerta CURA o Carrasco */
+else if(e.pat==='kz_morcegos'){e.data={t:0,fired:false,waves:0,waveT:0};texts.push({x:e.x,y:e.y-e.r-30,txt:'SPELL CARD — ENXAME VAMPIRO',t:0,life:1.5,c:'#c25a7a',size:12,disp:true});}
 }
 function kzActUpdateEx(e,dt){
 const kz2=e.kzP2;
+/* v1.7.0: EDITOR DE MODS — despacho da spell card do mod */
+if(e.pat==='kz_mod'&&window.__MODS){__MODS.spellUpdate(e,dt);return;}
 if(e.pat==='kz_guillotine'){
   /* GUILHOTINAS — linhas verticais piscam no chão, depois as lâminas caem */
   e.data.t+=dt;
-  if(e.data.done<(kz2?3:2)&&e.data.t>.3){
+  if(e.data.done<(kz2?4:3)&&e.data.t>.28){ /* v1.6.4: 4/3 guilhotinas (era 3/2) */
     e.data.t=0;e.data.done++;
     const lx=clamp(player.x+(e.data.done%2?-70:70)*rnd(.6,1.4),ROOM.x+50,ROOM.x+ROOM.w-50);
     kzWarn(lx,ROOM.y+ROOM.h/2,0,1.0,function(){
-      for(let k=0;k<7;k++){
-        ebullets.push({x:lx+rnd(-8,8),y:ROOM.y+30+k*(ROOM.h-60)/6,vx:0,vy:210,r:6,c:'#e8455a'});
+      for(let k=0;k<9;k++){ /* v1.6.4: 9 lâminas por coluna (era 7) */
+        ebullets.push({x:lx+rnd(-8,8),y:ROOM.y+30+k*(ROOM.h-60)/8,vx:0,vy:255,r:6,c:'#e8455a'}); /* v1.6.4: mais rápidas */
       }
       kzDetonate(lx,player.y,44,24,'#e8455a');
     },'#e8455a','line',Math.PI/2);
     sfx.growl();
   }
-  if(e.data.done>=(kz2?3:2)&&e.data.t>1.1)mbEnd(e);
+  if(e.data.done>=(kz2?4:3)&&e.data.t>1.1)mbEnd(e);
 }else if(e.pat==='kz_chain'){
   /* CORRENTE — leque giratório: varre 300° com brecha visível */
   e.data.t+=dt;
@@ -5995,10 +6083,10 @@ if(e.pat==='kz_guillotine'){
     e.data.spin+=dt*3.1;
     e.chainTick=(e.chainTick||0)-dt;
     if(e.chainTick<=0){
-      e.chainTick=kz2?.09:.13;
+      e.chainTick=kz2?.07:.10; /* v1.6.4: varredura mais densa */
       for(let k=-1;k<=1;k++){
-        const a=e.data.spin+k*.16;
-        ebullets.push({x:e.x,y:e.y,vx:Math.cos(a)*250,vy:Math.sin(a)*250,r:5,c:'#e8455a'});
+        const a=e.data.spin+k*.15;
+        ebullets.push({x:e.x,y:e.y,vx:Math.cos(a)*300,vy:Math.sin(a)*300,r:5,c:'#e8455a'}); /* v1.6.4: 300 (era 250) */
       }
     }
   }
@@ -6012,8 +6100,8 @@ if(e.pat==='kz_guillotine'){
     for(let k=0;k<4;k++){
       const ang=k*Math.PI/2;
       kzWarn(cx,cy,0,.95+k*.12,function(){
-        for(let s=60;s<=330;s+=54){
-          ebullets.push({x:cx+Math.cos(ang)*s,y:cy+Math.sin(ang)*s,vx:Math.cos(ang)*160,vy:Math.sin(ang)*160,r:5,c:'#e8455a'});
+        for(let s=60;s<=330;s+=42){ /* v1.6.4: 8 tiros por braço (era 6) */
+          ebullets.push({x:cx+Math.cos(ang)*s,y:cy+Math.sin(ang)*s,vx:Math.cos(ang)*200,vy:Math.sin(ang)*200,r:5,c:'#e8455a'}); /* v1.6.4: 200 (era 160) */
         }
         if(k===0||k===2)kzDetonate(cx,cy,50,26,'#e8455a');
       },'#e8455a','line',ang);
@@ -6021,35 +6109,159 @@ if(e.pat==='kz_guillotine'){
     sfx.growl();blip('square',200,90,.4,.16);
   }
   if(e.data.t>2.1)mbEnd(e);
-}else if(e.pat==='kz_ferro'){
-  /* v1.6.2: O FERRO — lanças horizontais cruzam a arena dos dois lados com uma brecha */
+}else if(e.pat==='kz_ricochet'){
+  /* ===== v1.6.3: INVESTIDA RICOCHETE (feitiço assinatura do Carrasco) =====
+     O Carrasco atravessa a arena, BATE na parede (zona de impacto + estilhaços
+     com brecha) e prepara OUTRA investida num ângulo diferente — a direção de
+     cada uma aparece NO CHÃO antes do movimento. FASE II: três investidas em
+     cadeia, com pausas curtas. Punição a movimento previsível: quem encosta na
+     parede com o Carrasco em cima leva a sentença. */
   e.data.t+=dt;
-  if(e.data.rows<(kz2?6:4)&&e.data.t>.3){
-    e.data.t=0;e.data.rows++;
-    const dir=e.data.rows%2?1:-1;
-    const gy=clamp(player.y+rnd(-120,120),ROOM.y+40,ROOM.y+ROOM.h-40);
-    kzWarn(ROOM.x+ROOM.w/2,gy,0,.8,function(){
-      const gapA=irnd(2,12);
-      for(let k=0;k<14;k++){
-        if(k===gapA||k===gapA+1)continue;
-        if(ebullets.length<400)ebullets.push({x:dir>0?ROOM.x-24:ROOM.x+ROOM.w+24,y:ROOM.y+30+k*(ROOM.h-60)/13,vx:dir*(kz2?300:250),vy:0,r:6,c:'#e8455a'});
+  const ph=e.data.phase;
+  if(ph==='aim'){
+    if(!e.data.aimed){
+      e.data.aimed=true;
+      let a;
+      if(e.data.lastA==null)a=Math.atan2(player.y-e.y,player.x-e.x); /* 1ª: em direção ao Thor */
+      else a=-e.data.lastA+rnd(-.55,.55); /* ricochete: reflexo + desvio */
+      e.data.aimA=a;
+      /* a direção aparece NO CHÃO: linha tracejada vermelha na rota da investida */
+      kzWarn(e.x+Math.cos(a)*260,e.y+Math.sin(a)*260,0,.5,null,'#e8455a','line',a);
+      sfx.growl();
+    }
+    if(e.data.t>.5){e.data.phase='dash';e.data.dashT=1.5;e.data.t=0;sfx.dash();sfx.roar();game.shake=Math.max(game.shake,6);}
+  }else if(ph==='dash'){
+    const sp=kz2?830:760; /* v1.6.4: investida mais veloz */
+    e.x+=Math.cos(e.data.aimA)*sp*dt;e.y+=Math.sin(e.data.aimA)*sp*dt;
+    e.ang=e.data.aimA;
+    if(Math.random()<dt*40)sparks(e.x,e.y,'#e8455a',2,70,.25,2,true);
+    const m=e.r+3;
+    if(e.data.t>=.12&&(e.x<=ROOM.x+m||e.x>=ROOM.x+ROOM.w-m||e.y<=ROOM.y+m||e.y>=ROOM.y+ROOM.h+m||e.data.dashT<=0)){
+      e.data.phase='impact';e.data.t=0;
+      /* ZONA DE IMPACTO na parede + estilhaços com brecha de 2 vagas */
+      kzDetonate(e.x,e.y,52,kz2?24:20,'#e8455a');
+      const n=kz2?18:13,gap=irnd(0,n-1); /* v1.6.4: 18/13 estilhaços (era 14/10) */
+      for(let k=0;k<n;k++){
+        if(k===gap||k===(gap+1)%n)continue;
+        const ba=k/n*TAU;
+        ebullets.push({x:e.x,y:e.y,vx:Math.cos(ba)*260,vy:Math.sin(ba)*260,r:5,c:'#e8455a'}); /* v1.6.4: 260 (era 220) */
       }
-      sfx.explode();game.shake=Math.max(game.shake,6);
-    },'#e8455a','line',0);
-    sfx.growl();
+      sfx.boom();game.shake=Math.max(game.shake,9);
+    }
+  }else if(ph==='impact'){
+    if(e.data.t>.42){ /* pausa curta entre as investidas da cadeia */
+      e.data.charges++;e.data.aimed=false;e.data.lastA=e.data.aimA;e.data.t=0;
+      e.data.phase=e.data.charges>=e.data.max?'done':'aim';
+    }
+  }else if(ph==='done'){
+    if(e.data.t>.3)mbEnd(e);
   }
-  if(e.data.rows>=(kz2?6:4)&&e.data.t>1.0)mbEnd(e);
+}else if(e.pat==='kz_avanco'){
+  /* ===== v1.6.4 · CORRIGIDO na v1.7.2: AVANÇO TRIPLO =====
+     Ele avança EM DIREÇÃO AO JOGADOR TRÊS VEZES: cada investida mira ONDE O
+     THOR ESTÁ (a rota aparece no chão como linha carmesim tracejada) e cada
+     batida na parede espalha estilhaços. NA TERCEIRA investida, QUANDO ELE SE
+     APROXIMA do Thor (~150px), desfere O ATAQUE DA PÁ ali mesmo: anel de
+     aviso 132px, 0.5s para sair do anel, depois o estouro com brechas. Se o
+     Thor despistar e ele só achar a parede, o golpe sai do mesmo jeito.
+     FASE II: avanços mais rápidos e o golpe cospe um anel extra com brechas. */
+  e.data.t+=dt;
+  const ph=e.data.phase;
+  if(ph==='aim'){
+    if(!e.data.aimed){
+      e.data.aimed=true;
+      /* v1.7.2: TODAS as investidas perseguem o Thor — mira ATUALIZADA a cada avanço */
+      const a=Math.atan2(player.y-e.y,player.x-e.x);
+      e.data.aimA=a;
+      kzWarn(e.x+Math.cos(a)*260,e.y+Math.sin(a)*260,0,.5,null,'#e8455a','line',a);
+      sfx.growl();
+    }
+    if(e.data.t>.45){e.data.phase='dash';e.data.dashT=1.5;e.data.t=0;sfx.dash();game.shake=Math.max(game.shake,6);}
+  }else if(ph==='dash'){
+    const sp=e.kzP2?800:720;
+    e.x+=Math.cos(e.data.aimA)*sp*dt;e.y+=Math.sin(e.data.aimA)*sp*dt;
+    e.ang=e.data.aimA;
+    if(Math.random()<dt*40)sparks(e.x,e.y,'#e8455a',2,70,.25,2,true);
+    const m=e.r+3;
+    /* v1.7.2: no 3º avanço, CHEGAR PERTO do Thor dispara O GOLPE DA PÁ na hora
+       (a rota de fuga continua sendo SAIR DO ANEL — 0.5s de aviso) */
+    const pd=Math.hypot(player.x-e.x,player.y-e.y);
+    const paNow=e.data.charges>=e.data.max-1&&e.data.t>=.12&&pd<150;
+    if(paNow||(e.data.t>=.12&&(e.x<=ROOM.x+m||e.x>=ROOM.x+ROOM.w-m||e.y<=ROOM.y+m||e.y>=ROOM.y+ROOM.h+m||e.data.dashT<=0))){
+      e.data.charges++;
+      if(!paNow){ /* de parede: estilhaços; de perto: o golpe da pá já avisa por si */
+        kzDetonate(e.x,e.y,46,18,'#e8455a');
+        game.shake=Math.max(game.shake,9);
+      }
+      if(e.data.charges>=e.data.max){
+        /* o ATAQUE DA PÁ — de perto, com aviso ao redor dele */
+        e.data.phase='pa';e.data.t=0;
+        kzWarn(e.x,e.y,132,.5,null,'#ff2450');
+        sfx.roar();
+      }else{
+        e.data.phase='aim';e.data.aimed=false;e.data.lastA=e.data.aimA;e.data.t=0;
+      }
+    }
+  }else if(ph==='pa'){
+    /* o golpe da pá desce — quem estiver perto leva; a rota de fuga é SAIR DO ANEL */
+    if(e.data.t>.5&&!e.data.paDone){
+      e.data.paDone=true;
+      kzDetonate(e.x,e.y,132,e.kzP2?30:26,'#ff2450');
+      const n=e.kzP2?18:14,gap=irnd(0,n-1);
+      for(let k=0;k<n;k++){
+        if(k===gap||k===(gap+1)%n||k===(gap+2)%n)continue;
+        const ba=k/n*TAU+rnd(.2);
+        ebullets.push({x:e.x+Math.cos(ba)*18,y:e.y+Math.sin(ba)*18,vx:Math.cos(ba)*(e.kzP2?300:265),vy:Math.sin(ba)*(e.kzP2?300:265),r:6,c:'#e8455a'});
+      }
+      /* a lâmina da pá varre na direção que ele estava olhando */
+      const fa=e.ang;
+      for(let k=-2;k<=2;k++){
+        const ba=fa+k*.2;
+        ebullets.push({x:e.x,y:e.y,vx:Math.cos(ba)*360,vy:Math.sin(ba)*360,r:7,c:'#ff2450'});
+      }
+      sfx.boom();game.shake=Math.max(game.shake,13);game.flash=Math.max(game.flash,.16);
+    }
+    if(e.data.t>.95){e.data.paDone=false;mbEnd(e);}
+  }
+}else if(e.pat==='kz_morcegos'){
+  /* ===== v1.6.4: ENXAME VAMPIRO (morcegos que CURAM o Carrasco) =====
+     Ele solta morcegos que perseguem o Thor. CADA morcego que ACERTA devolve
+     vida ao Carrasco (o número verde em cima dele mostra a cura). Os morcegos
+     podem ser DERRUBADOS a tiro — abater o enxame é negar a cura. FASE II:
+     duas vagas e morcegos que curam mais. */
+  e.data.t+=dt;
+  const kz2=e.kzP2;
+  if(!e.data.fired){
+    e.data.fired=true;e.data.waveT=.1;
+    sfx.howl();blip('sawtooth',180,70,.5,.14);
+  }
+  e.data.waveT-=dt;
+  if(e.data.waveT<=0&&e.data.waves<(kz2?2:1)){
+    e.data.waves++;e.data.waveT=1.0;
+    const n=kz2?7:5;
+    for(let k=0;k<n;k++){
+      const a=(k/n)*TAU+e.seed;
+      ebullets.push({x:e.x+Math.cos(a)*24,y:e.y+Math.sin(a)*24,vx:Math.cos(a)*120,vy:Math.sin(a)*120,r:7,c:'#c25a7a',home:2.2,homeT:6.5,life:6.5,bat:true,heal:kz2?26:18,owner:e});
+    }
+    sparks(e.x,e.y,'#c25a7a',14,220,.6,4,true);sfx.spit();
+  }
+  if(e.data.waves>=(kz2?2:1)&&e.data.t>2.6)mbEnd(e);
+  if(e.data.t>4.2)mbEnd(e);
 }
 }
 /* ---- A VIÚVA: teias, cria, laço ---- */
 function kzActStartVi(e){
+/* v1.7.0: EDITOR DE MODS — despacho da spell card do mod */
+if(e.pat==='kz_mod'&&window.__MODS){__MODS.spellStart(e);return;}
 if(e.pat==='kz_web'){e.data={t:0,webs:[],cast:0};}
 else if(e.pat==='kz_brood'){e.data={t:0,done:false};}
 else if(e.pat==='kz_snare'){e.data={t:0,px:player.x,py:player.y,fired:0};}
-else if(e.pat==='kz_casulo'){e.data={s:0,t:.15};} /* v1.6.2 */
+else if(e.pat==='kz_threads'){e.data={t:0,built:false,threads:[]};texts.push({x:e.x,y:e.y-e.r-30,txt:'SPELL CARD — FIOS DA MORTE',t:0,life:1.5,c:'#dfe7ee',size:12,disp:true});}
 }
 function kzActUpdateVi(e,dt){
 const kz2=e.kzP2;
+/* v1.7.0: EDITOR DE MODS — despacho da spell card do mod */
+if(e.pat==='kz_mod'&&window.__MODS){__MODS.spellUpdate(e,dt);return;}
 if(e.pat==='kz_web'){
   /* TEIAS — zonas que prendem o chão (lentidão no jogador) e caem com o tempo */
   e.data.t+=dt;e.data.cast-=dt;
@@ -6078,8 +6290,8 @@ if(e.pat==='kz_web'){
   if(!e.data.done&&e.data.t>.5){
     e.data.done=true;
     const n=enemies.filter(o=>!o.dead&&!o._brood).length;
-    if(n<(kz2?4:3)){
-      for(let k=0;k<(kz2?3:2);k++){
+    if(n<(kz2?5:4)){ /* v1.6.4: teto maior para a ninhada maior */
+      for(let k=0;k<(kz2?4:3);k++){ /* v1.6.4: 4/3 crias (era 3/2) */
         spawnEnemy('sh',e.x+rnd(-60,60),e.y+rnd(-50,50));
         const b=enemies[enemies.length-1];
         if(b&&!b.dead){b._brood=true;b.hp*=.55;b.maxHp*=.55;b.r*=.8;}
@@ -6093,7 +6305,7 @@ if(e.pat==='kz_web'){
   e.data.t+=dt;
   if(!e.data.fired&&e.data.t>.4){
     e.data.fired=1;
-    const n=kz2?26:20,gap=irnd(0,n-1),spd=kz2?150:130;
+    const n=kz2?32:26,gap=irnd(0,n-1),spd=kz2?190:165; /* v1.6.4: anel de 32/26 (era 26/20) */
     for(let i=0;i<n;i++){
       if(i===gap||(i+1)%n===gap||i===(gap+n-1)%n)continue;
       const a=i/n*TAU;
@@ -6102,60 +6314,88 @@ if(e.pat==='kz_web'){
     sfx.spit();
   }
   if(e.data.t>1.6)mbEnd(e);
-}else if(e.pat==='kz_casulo'){
-  /* v1.6.2: O CASULO — espiral de minas lentas + filhotes que perseguem curto */
-  e.data.t-=dt;
-  if(e.data.t<=0&&e.data.s<(kz2?26:18)){
-    e.data.s++;e.data.t=.07;
-    const a=e.data.s*.5+e.seed;
-    if(ebullets.length<400)ebullets.push({x:e.x+Math.cos(a)*16,y:e.y+Math.sin(a)*16,vx:Math.cos(a)*(kz2?95:80),vy:Math.sin(a)*(kz2?95:80),r:6,c:'#9d6bb5',slowShot:true});
+}else if(e.pat==='kz_threads'){
+  /* ===== v1.6.3: FIOS DA MORTE (feitiço assinatura da Viúva) =====
+     A Viúva tece fios entre âncoras fixas da arena: primeiro aparecem como
+     LINHAS FINAS, depois TENSIONAM e passam a CORTAR o espaço entre elas.
+     FASE II: os fios ativam EM SEQUÊNCIA formando triângulo e diagonais, os
+     já ativos CONTINUAM visíveis até acabar — e um lado da arena fica sempre
+     aberto (regra da casa: nunca fechar todas as rotas de fuga). */
+  e.data.t+=dt;
+  if(!e.data.built){
+    e.data.built=true;
+    const P=[[.12,.14],[.88,.14],[.12,.86],[.88,.86]];
+    const anchors=P.map(q=>({x:ROOM.x+q[0]*ROOM.w,y:ROOM.y+q[1]*ROOM.h}));
+    /* Fase I: 3 fios (topo, base, diagonal) — laterais sempre abertas.
+       Fase II: 4 fios em sequência (triângulo + diagonal) — lado esquerdo aberto. */
+    const pairs=kz2?[[0,1],[1,3],[2,3],[0,3]]:[[0,1],[2,3],[0,3]];
+    e.data.threads=pairs.map((pr,i)=>{
+      const a=anchors[pr[0]],b=anchors[pr[1]];
+      const th={ax:a.x,ay:a.y,bx:b.x,by:b.y,cut:false,warn:.45+i*(kz2?.4:.3),life:0};
+      /* fase FINA: linha fina e pálida — o aviso de onde vai cortar */
+      telegraphs.push({x:(a.x+b.x)/2,y:(a.y+b.y)/2,r:0,t:0,dur:.5,c:'#dfe7ee',shape:'line',ang:Math.atan2(b.y-a.y,b.x-a.x),cb:null,tlen:dist(a.x,a.y,b.x,b.y)});
+      return th;
+    });
+    sfx.growl();blip('sine',320,90,.6,.1);
   }
-  if(e.data.s>=(kz2?26:18)&&!e.data.b){
-    e.data.b=1;
-    for(let k=0;k<(kz2?4:3);k++){
-      const ba=rnd(TAU);
-      if(ebullets.length<400)ebullets.push({x:e.x,y:e.y,vx:Math.cos(ba)*150,vy:Math.sin(ba)*150,r:6,c:'#c9a0ff',home:1,homeT:1.8,life:3.4});
+  let cutting=0,alive=0;
+  for(const th of e.data.threads){
+    if(!th.cut){
+      th.warn-=dt;
+      if(th.warn<=0){th.cut=true;th.life=kz2?2.4:1.7;sparks((th.ax+th.bx)/2,(th.ay+th.by)/2,'#dfe7ee',10,150,.45,2,true);sfx.freeze();blip('sawtooth',700,200,.18,.1);}
+    }else{
+      th.life-=dt;if(th.life>0)alive++;
+      if(th.life>0){
+        cutting++;
+        /* o fio esticado CORTA: quem cruza o segmento leva o golpe */
+        if(!player.dead&&segDist(player.x,player.y,th.ax,th.ay,th.bx,th.by)<11+(player.hitR||player.r)*.5)hurtPlayer(); /* v1.4.6 hitR */
+        if(Math.random()<dt*10)particles.push({x:lerp(th.ax,th.bx,Math.random()),y:lerp(th.ay,th.by,Math.random()),vx:rnd(-8,8),vy:rnd(-8,8),life:.35,t:0,r:1.6,c:'rgba(223,231,238,.6)',drag:1});
+      }
     }
-    sfx.howl();
   }
-  if(e.data.s>=(kz2?26:18)&&e.data.t<=-.5)mbEnd(e);
+  if(e.data.t>1.4&&alive===0)mbEnd(e);
+  if(e.data.t>5.4)mbEnd(e);
 }
 }
-/* ---- O GOLEM: fissuras, tempestade de cinzas, núcleo fundido ---- */
 function kzActStartGz(e){
+const kz2=e.kzP2; /* v1.6.3: os cards novos usam a fase no Start */
+/* v1.7.0: EDITOR DE MODS — despacho da spell card do mod */
+if(e.pat==='kz_mod'&&window.__MODS){__MODS.spellStart(e);return;}
 if(e.pat==='kz_fissure'){e.data={rows:0,t:0};}
 else if(e.pat==='kz_ashstorm'){e.data={t:0,cast:false};}
 else if(e.pat==='kz_core'){e.data={t:0,v:0};}
-else if(e.pat==='kz_pira'){e.data={cols:0,t:.2};} /* v1.6.2 */
+else if(e.pat==='kz_magma'){e.data={t:0,wave:0,launched:false,fired:false,sub:0,subT:0,max:kz2?2:1,gaps:[],horiz:true,dir:1,tag:'mz'+irnd(0,1e9)};texts.push({x:e.x,y:e.y-e.r-30,txt:'SPELL CARD — MARÉ DE MAGMA',t:0,life:1.5,c:'#ff8f3d',size:12,disp:true});}
 }
 function kzActUpdateGz(e,dt){
 const kz2=e.kzP2;
+/* v1.7.0: EDITOR DE MODS — despacho da spell card do mod */
+if(e.pat==='kz_mod'&&window.__MODS){__MODS.spellUpdate(e,dt);return;}
 if(e.pat==='kz_fissure'){
   /* FISSURAS — 3 linhas horizontais (na sua altura e vizinhas) cuspidas de fogo */
   e.data.t+=dt;
-  if(e.data.rows<(kz2?3:2)&&e.data.t>.35){
+  if(e.data.rows<(kz2?4:3)&&e.data.t>.32){ /* v1.6.4: 4/3 fissuras (era 3/2) */
     e.data.t=0;e.data.rows++;
     const ly=clamp(ROOM.y+40+(e.data.rows%2?(ROOM.h-80)*.5:0)+(e.data.rows>2?(ROOM.h-80)*.75:0),ROOM.y+40,ROOM.y+ROOM.h-40);
     if(e.data.rows===1)ly=clamp(player.y,ROOM.y+40,ROOM.y+ROOM.h-40);
     kzWarn(ROOM.x+ROOM.w/2,ly,0,1.05,function(){
-      for(let k=0;k<10;k++){
-        const fx=ROOM.x+50+k*(ROOM.w-100)/9;
-        ebullets.push({x:fx,y:ly+rnd(-6,6),vx:rnd(-30,30),vy:rnd(-130,-90),r:7,c:'#ff8f3d',life:2.6});
+      for(let k=0;k<13;k++){ /* v1.6.4: 13 cusparadas por linha (era 10) */
+        const fx=ROOM.x+50+k*(ROOM.w-100)/12;
+        ebullets.push({x:fx,y:ly+rnd(-6,6),vx:rnd(-30,30),vy:rnd(-165,-115),r:7,c:'#ff8f3d',life:2.6}); /* v1.6.4: mais rápidas */
       }
       sfx.explode();game.shake=Math.max(game.shake,10);
     },'#ff8f3d','line',0);
     sfx.growl();
   }
-  if(e.data.rows>=(kz2?3:2)&&e.data.t>1.2)mbEnd(e);
+  if(e.data.rows>=(kz2?4:3)&&e.data.t>1.2)mbEnd(e);
 }else if(e.pat==='kz_ashstorm'){
   /* TEMPESTADE DE CINZAS — nuvens em serpentina atravessam a sala */
   e.data.t+=dt;
   if(!e.data.cast&&e.data.t>.4){
     e.data.cast=true;
-    const n=kz2?10:7;
+    const n=kz2?14:10; /* v1.6.4: 14/10 nuvens (era 10/7) */
     for(let k=0;k<n;k++){
       const side=k%2?1:-1;
-      ebullets.push({x:side>0?ROOM.x-30:ROOM.x+ROOM.w+30,y:ROOM.y+60+k*(ROOM.h-120)/Math.max(1,n-1),vx:side*rnd(120,150),vy:0,r:8,c:'#8f8577',sine:k,life:7});
+      ebullets.push({x:side>0?ROOM.x-30:ROOM.x+ROOM.w+30,y:ROOM.y+60+k*(ROOM.h-120)/Math.max(1,n-1),vx:side*rnd(150,190),vy:0,r:8,c:'#8f8577',sine:k,life:7}); /* v1.6.4: mais rápidas */
     }
     sfx.rumble();noiseSfx(.8,.2,300,'lowpass');
   }
@@ -6163,45 +6403,98 @@ if(e.pat==='kz_fissure'){
 }else if(e.pat==='kz_core'){
   /* NÚCLEO FUNDIDO — carrega 0.9s (glow) e explode em espiral tripla com brechas */
   e.data.t+=dt;
-  if(e.data.t>.9&&e.data.v<(kz2?3:2)){
+  if(e.data.t>.9&&e.data.v<(kz2?4:3)){ /* v1.6.4: 4/3 vagas de espiral (era 3/2) */
     e.data.v++;
     e.data.t=.9-.15;
     const off=rnd(TAU);
-    for(let k=0;k<18;k++){
-      if(k%5===4)continue; /* brecha fixa a cada volta */
-      const a=off+k/18*TAU+e.data.v*.35;
-      ebullets.push({x:e.x,y:e.y,vx:Math.cos(a)*190,vy:Math.sin(a)*190,r:6,c:'#ff8f3d'});
+    for(let k=0;k<24;k++){ /* v1.6.4: 24 na volta (era 18) */
+      if(k%6===5)continue; /* brecha fixa a cada volta */
+      const a=off+k/24*TAU+e.data.v*.35;
+      ebullets.push({x:e.x,y:e.y,vx:Math.cos(a)*235,vy:Math.sin(a)*235,r:6,c:'#ff8f3d'}); /* v1.6.4: 235 (era 190) */
     }
     sfx.boom();game.shake=Math.max(game.shake,8);
   }
-  if(e.data.v>=(kz2?3:2)&&e.data.t>.75)mbEnd(e);
-}else if(e.pat==='kz_pira'){
-  /* v1.6.2: A PIRA — colunas de fogo telegrafadas varrem a arena */
+  if(e.data.v>=(kz2?4:3)&&e.data.t>.75)mbEnd(e);
+}else if(e.pat==='kz_magma'){
+  /* ===== v1.6.3: MARÉ DE MAGMA (feitiço assinatura do Golem) =====
+     Uma onda de magma atravessa a arena de uma extremidade à outra. Antes de
+     avançar, SINAIS LUMINOSOS revelam a direção e as posições das zonas
+     seguras (faixas verdes). FASE II: uma SEGUNDA onda vem de outra direção
+     DEPOIS que a primeira desaparece — e algumas zonas seguras mudam de lugar.
+     Ela muda o ritmo da luta: enfrentar o ambiente, não só o chefe. */
   e.data.t+=dt;
-  if(e.data.cols<(kz2?5:3)&&e.data.t>.42){
-    e.data.t=0;e.data.cols++;
-    const cx=ROOM.x+40+(e.data.cols-1)*(ROOM.w-80)/Math.max(1,(kz2?5:3)-1)+rnd(-40,40);
-    kzWarn(cx,ROOM.y+ROOM.h/2,0,.9,function(){
-      for(let k=0;k<9;k++){
-        if(ebullets.length<400)ebullets.push({x:cx+rnd(-8,8),y:ROOM.y+ROOM.h-20-k*(ROOM.h-60)/8,vx:0,vy:-(kz2?240:200),r:7,c:'#ff8f3d',life:2.4});
-      }
-      kzDetonate(cx,player.y,40,22,'#ff8f3d');
-    },'#ff8f3d','line',Math.PI/2);
-    sfx.growl();
+  const d0=e.data;
+  if(!d0.launched&&d0.wave<d0.max&&d0.t>.35){
+    d0.launched=true;d0.t=0;
+    d0.horiz=d0.wave===0; /* 1ª onda horizontal · 2ª (Fase II) vertical */
+    d0.dir=Math.random()<.5?1:-1;
+    const slots=14,gaps=[]; /* v1.6.4: 14 vagas (era 12) */
+    while(gaps.length<(kz2?3:2)){
+      const g=irnd(1,slots-2);
+      if(gaps.indexOf(g)<0&&gaps.indexOf(g-1)<0&&gaps.indexOf(g+1)<0)gaps.push(g);
+    }
+    d0.gaps=gaps;d0.slots=slots;d0.sub=0;d0.subT=0;d0.fired=false;
+    /* SINAIS: as zonas seguras no chão (faixas verde-musgo) + a borda de onde a maré nasce */
+    const band=(d0.horiz?ROOM.h-60:ROOM.w-60)/slots;
+    for(const g of gaps){
+      const p0=(g+.5)/slots;
+      const mx=d0.horiz?ROOM.x+ROOM.w/2:ROOM.x+30+p0*(ROOM.w-60);
+      const my=d0.horiz?ROOM.y+30+p0*(ROOM.h-60):ROOM.y+ROOM.h/2;
+      kzWarn(mx,my,band*.62,1.15,null,'#5ad0a0');
+    }
+    kzWarn(d0.horiz?(d0.dir>0?ROOM.x+16:ROOM.x+ROOM.w-16):ROOM.x+ROOM.w/2,
+           d0.horiz?ROOM.y+ROOM.h/2:(d0.dir>0?ROOM.y+16:ROOM.y+ROOM.h-16),
+           0,1.15,null,'#ff8f3d','line',d0.horiz?Math.PI/2:0);
+    sfx.rumble();noiseSfx(.9,.22,240,'lowpass');
   }
-  if(e.data.cols>=(kz2?5:3)&&e.data.t>1.1)mbEnd(e);
+  if(d0.launched&&!d0.fired){
+    d0.subT+=dt;
+    /* a maré avança em 3 cristas (mesmas brechas — as faixas seguras valem para todas) */
+    if(d0.subT>.25&&d0.sub<4){ /* v1.6.4: 4 cristas (eram 3) */
+      d0.subT=0;d0.sub++;
+      const spd=d0.wave===0?(kz2?295:265):(kz2?375:340); /* v1.6.4: maré mais rápida */
+      d0.spd=spd;
+      for(let k=0;k<d0.slots;k++){
+        if(d0.gaps.indexOf(k)>=0)continue;
+        const p0=(k+.5)/d0.slots;
+        let bx,by,vx,vy;
+        if(d0.horiz){bx=d0.dir>0?ROOM.x-26:ROOM.x+ROOM.w+26;by=ROOM.y+30+p0*(ROOM.h-60);vx=d0.dir*spd;vy=0;}
+        else{by=d0.dir>0?ROOM.y-26:ROOM.y+ROOM.h+26;bx=ROOM.x+30+p0*(ROOM.w-60);vx=0;vy=d0.dir*spd;}
+        ebullets.push({x:bx,y:by,vx:vx,vy:vy,r:7,c:'#ff6b2d',life:8,tid:d0.tag});
+      }
+      if(d0.sub===1){sfx.explode();game.shake=Math.max(game.shake,11);game.flash=Math.max(game.flash,.14);}
+      else sfx.spit();
+    }
+    if(d0.sub>=3&&d0.subT>.25){d0.fired=true;d0.t=0;}
+  }
+  if(d0.fired){
+    /* FASE II: a 2ª onda SÓ nasce depois que a 1ª desaparece (contagem por tag) */
+    let left=0;for(const b of ebullets)if(b.tid===d0.tag)left++;
+    if(left===0||d0.t>7){
+      d0.wave++;d0.launched=false;d0.fired=false;d0.t=0;
+      if(d0.wave>=d0.max){mbEnd(e);}
+    }
+  }
+  if(e.data.t>13)mbEnd(e);
 }
 }
 /* ---- despachantes dos padrões exclusivos (por tipo de boss) ---- */
 const _kzStartMap={mb:kzActStart,ex:kzActStartEx,vi:kzActStartVi,gz:kzActStartGz};
 const _kzUpdateMap={mb:kzActUpdate,ex:kzActUpdateEx,vi:kzActUpdateVi,gz:kzActUpdateGz};
 const _kzPatsMap={
-mb:['kz_runes','kz_mirrors','kz_comets','kz_pacto'],
-ex:['kz_guillotine','kz_chain','kz_execute','kz_ferro'],
-vi:['kz_web','kz_brood','kz_snare','kz_casulo'],
-gz:['kz_fissure','kz_ashstorm','kz_core','kz_pira']}; /* v1.6.2: um QUARTO padrão exclusivo para cada um — bullet hell de verdade */
+mb:['kz_runes','kz_mirrors','kz_comets','kz_grimoire'],
+ex:['kz_guillotine','kz_chain','kz_execute','kz_ricochet','kz_avanco','kz_morcegos'],
+vi:['kz_web','kz_brood','kz_snare','kz_threads'],
+gz:['kz_fissure','kz_ashstorm','kz_core','kz_magma']};
+/* v1.6.3: OS QUATRO FEITIÇOS — o card ASSINATURA de cada miniboss:
+   Bruxo → GRIMÓRIO RASGADO · Carrasco → INVESTIDA RICOCHETE ·
+   Viúva → FIOS DA MORTE · Golem → MARÉ DE MAGMA.
+   A Fase II dá a cada um a transformação mecânica própria (o card muda de
+   comportamento aos 50% de vida) e o feitiço assinatura domina o sorteio. */
+const _kzSignature={mb:'kz_grimoire',ex:'kz_ricochet',vi:'kz_threads',gz:'kz_magma'};
+const _kzSigName={mb:'GRIMÓRIO RASGADO',ex:'INVESTIDA RICOCHETE',vi:'FIOS DA MORTE',gz:'MARÉ DE MAGMA'};
 function mbSpawnWall(dir,e){
-const gapA=irnd(2,10),gapB=irnd(2,10),spd=kzH(e)?260:240;
+const gapA=irnd(2,10),gapB=irnd(2,10),spd=kzH(e)?320:295; /* v1.6.4: parede de bala mais rápida */
 for(let i=0;i<14;i++){
 if(kzH(e)?(i===gapA||i===gapB):(i===gapA||i===gapA+1||i===gapB||i===gapB+1))continue;
 const y=ROOM.y+40+i*(ROOM.h-80)/13;
@@ -6220,15 +6513,17 @@ sfx.spit();sfx.growl();
 }
 function mbActUpdate(e,dt){
 const pp=player;
+/* v1.7.0: EDITOR DE MODS — despacho da spell card do mod */
+if(e.pat==='kz_mod'&&window.__MODS){__MODS.spellUpdate(e,dt);return;}
 /* v0.9.16: padrões exclusivos KAIZO — despachados por tipo de boss */
 if(e.pat&&e.pat.indexOf('kz_')===0){(_kzUpdateMap[e.type]||function(){})(e,dt);return;}
 if(e.pat==='spiral'){
 e.data.tick-=dt;
 if(e.data.tick<=0){
-e.data.tick=kzH(e)?.05:.08;e.data.spin+=kzH(e)?.42:.3;
-for(let k=0;k<(kzH(e)?4:2);k++){
-const a=e.data.spin+k*Math.PI/(kzH(e)?2:1);
-ebullets.push({x:e.x,y:e.y,vx:Math.cos(a)*175,vy:Math.sin(a)*175,r:5,c:'#cfd8dc'});
+e.data.tick=kzH(e)?.04:.08;e.data.spin+=kzH(e)?.42:.3;
+for(let k=0;k<(kzH(e)?5:2);k++){ /* v1.6.4: 5 braços no kaizo (eram 4) */
+const a=e.data.spin+k*Math.PI/(kzH(e)?2.5:1);
+ebullets.push({x:e.x,y:e.y,vx:Math.cos(a)*205,vy:Math.sin(a)*205,r:5,c:'#cfd8dc'}); /* v1.6.4: 205 (era 175) */
 }
 }
 if(e.stT>=e.data.dur)mbEnd(e);
@@ -6337,9 +6632,9 @@ if(kzH(e)&&e.stT>=1.2&&!e.data.w3){e.data.w3=true;mbSpawnWall(Math.random()<.5?1
 if(e.stT>=(kzH(e)?1.8:1.3))mbEnd(e);
 }else if(e.pat==='meteor'){
 e.data.salvoT-=dt;
-if(e.data.salvoT<=0&&e.data.s<(kzH(e)?5:3)){
-e.data.s++;e.data.salvoT=kzH(e)?.42:.6;
-const nm=kzH(e)?6:3;
+if(e.data.salvoT<=0&&e.data.s<(kzH(e)?6:3)){ /* v1.6.4: 6 salvos no kaizo (eram 5) */
+e.data.s++;e.data.salvoT=kzH(e)?.36:.6;
+const nm=kzH(e)?7:3; /* v1.6.4: 7 meteoros por salvo (eram 6) */
 for(let i=0;i<nm;i++){
 const a=rnd(TAU),dd=rnd(0,kzH(e)?180:130);
 const pt=roomPt(pp.x+Math.cos(a)*dd,pp.y+Math.sin(a)*dd,50);
@@ -6347,32 +6642,32 @@ geyserMarks.push({x:pt.x,y:pt.y,t:0,dur:kzH(e)?.55:.75,phase:'mark',c:'#cfd8dc'}
 }
 blip('sawtooth',110,70,.3,.08);
 }
-if(e.data.s>=(kzH(e)?5:3)&&e.stT>=(kzH(e)?2.4:1.9))mbEnd(e);
+if(e.data.s>=(kzH(e)?6:3)&&e.stT>=(kzH(e)?2.4:1.9))mbEnd(e); /* v1.6.4: acompanha o novo teto de salvos */
 }else if(e.pat==='shotgun'){
 e.data.t-=dt;
-if(e.data.t<=0&&e.data.volleys<(kzH(e)?5:4)){
-e.data.volleys++;e.data.t=.24;
-const base=Math.atan2(pp.y-e.y,pp.x-e.x),n=kzH(e)?8:6;
+if(e.data.t<=0&&e.data.volleys<(kzH(e)?6:4)){ /* v1.6.4: 6 rajadas no kaizo (eram 5) */
+e.data.volleys++;e.data.t=.2;
+const base=Math.atan2(pp.y-e.y,pp.x-e.x),n=kzH(e)?10:6; /* v1.6.4: 10 chumbinhos (eram 8) */
 for(let i=0;i<n;i++){
-const a=base+(i-(n-1)/2)*.11;
-ebullets.push({x:e.x,y:e.y,vx:Math.cos(a)*340,vy:Math.sin(a)*340,r:5,c:'#cfd8dc'});
+const a=base+(i-(n-1)/2)*.10;
+ebullets.push({x:e.x,y:e.y,vx:Math.cos(a)*385,vy:Math.sin(a)*385,r:5,c:'#cfd8dc'}); /* v1.6.4: 385 (era 340) */
 }
 sfx.spit();
 }
-if(e.data.volleys>=(kzH(e)?5:4)&&e.stT>=1.4)mbEnd(e);
+if(e.data.volleys>=(kzH(e)?6:4)&&e.stT>=1.4)mbEnd(e);
 }else if(e.pat==='rings'){
 e.data.ringT-=dt;
-if(e.data.ringT<=0&&e.data.rings<(kzH(e)?4:3)){
-e.data.rings++;e.data.ringT=.5;e.data.gap+=1.1;
+if(e.data.ringT<=0&&e.data.rings<(kzH(e)?5:3)){ /* v1.6.4: 5 coroas no kaizo (eram 4) */
+e.data.rings++;e.data.ringT=.44;e.data.gap+=1.1;
 if(dmk()){
 /* círculos consecutivos rotativos — o espelho cospe coroas cheias */
-dmkCircle(e.x,e.y,Math.round((kzH(e)?18:14)*dmkDen()),(kzH(e)?300:270)*dmkSp(),{c:'#cfd8dc',off:e.data.gap,alt:.8});
+dmkCircle(e.x,e.y,Math.round((kzH(e)?22:14)*dmkDen()),(kzH(e)?330:270)*dmkSp(),{c:'#cfd8dc',off:e.data.gap,alt:.8}); /* v1.6.4: 22 balas (eram 18) */
 }else{
-rings.push({x:e.x,y:e.y,r:26,vr:kzH(e)?330:300,th:13,gapA:e.data.gap,gapW:.85,c:'#cfd8dc'});
+rings.push({x:e.x,y:e.y,r:26,vr:kzH(e)?360:300,th:13,gapA:e.data.gap,gapW:.85,c:'#cfd8dc'}); /* v1.6.4: anel mais rápido */
 }
 sfx.freeze();
 }
-if(e.data.rings>=(kzH(e)?4:3)&&e.stT>=1.8)mbEnd(e);
+if(e.data.rings>=(kzH(e)?5:3)&&e.stT>=1.8)mbEnd(e);
 }else if(e.pat==='bothwalls'){
 if(!e.data.h){e.data.h=true;mbSpawnWall(1,e);mbSpawnWall(-1,e);}
 if(e.stT>=.7&&!e.data.v){e.data.v=true;mbSpawnWallV(Math.random()<.5?1:-1);}
@@ -6381,37 +6676,37 @@ if(e.stT>=(kzH(e)?1.6:1.4))mbEnd(e);
 }else if(e.pat==='twin'){
 e.data.tick-=dt;
 if(e.data.tick<=0){
-e.data.tick=kzH(e)?.08:.09;e.data.spin+=.38;
+e.data.tick=kzH(e)?.065:.09;e.data.spin+=.38; /* v1.6.4: gêmeo mais rápido */
 const arms=kzH(e)?3:2;
 for(let k=0;k<arms;k++){
 const a=e.data.spin+k*Math.PI/arms;
-ebullets.push({x:e.x,y:e.y,vx:Math.cos(a)*175,vy:Math.sin(a)*175,r:5,c:'#cfd8dc'});
+ebullets.push({x:e.x,y:e.y,vx:Math.cos(a)*205,vy:Math.sin(a)*205,r:5,c:'#cfd8dc'}); /* v1.6.4: 205 (era 175) */
 const a2=-e.data.spin*1.15+k*Math.PI/arms;
-ebullets.push({x:e.x,y:e.y,vx:Math.cos(a2)*175,vy:Math.sin(a2)*175,r:5,c:'#e6f0f2'});
+ebullets.push({x:e.x,y:e.y,vx:Math.cos(a2)*205,vy:Math.sin(a2)*205,r:5,c:'#e6f0f2'});
 }
 }
 if(e.stT>=e.data.dur)mbEnd(e);
 }else if(e.pat==='bounce'){
 e.data.tick-=dt;
 if(e.data.tick<=0){
-e.data.tick=kzH(e)?.16:.22;
-const n=kzH(e)?3:2;
+e.data.tick=kzH(e)?.13:.22; /* v1.6.4: rebotes mais frequentes no kaizo */
+const n=kzH(e)?4:2; /* v1.6.4: 4 bolas que quicam (eram 3) */
 for(let i=0;i<n;i++){
 const a=rnd(TAU);
-ebullets.push({x:e.x,y:e.y,vx:Math.cos(a)*(kzH(e)?260:215),vy:Math.sin(a)*(kzH(e)?260:215),r:6,c:'#cfd8dc',bounce:true,bounces:kzH(e)?4:3});
+ebullets.push({x:e.x,y:e.y,vx:Math.cos(a)*(kzH(e)?295:215),vy:Math.sin(a)*(kzH(e)?295:215),r:6,c:'#cfd8dc',bounce:true,bounces:kzH(e)?4:3}); /* v1.6.4: 295 (era 260) */
 }
 sfx.spit();
 }
 if(e.stT>=e.data.dur)mbEnd(e);
 }else if(e.pat==='flower'){
 e.data.ringT-=dt;
-const maxR=kzH(e)?4:3;
+const maxR=kzH(e)?5:3; /* v1.6.4: 5 coroas no kaizo (eram 4) */
 if(e.data.ringT<=0&&e.data.rings<maxR){
-e.data.rings++;e.data.ringT=.42;
-const n=kzH(e)?14:12,off=e.data.rings*.26;
+e.data.rings++;e.data.ringT=.4;
+const n=kzH(e)?17:12,off=e.data.rings*.26; /* v1.6.4: 17 pétalas (eram 14) */
 for(let i=0;i<n;i++){
 const a=off+i/n*TAU;
-ebullets.push({x:e.x,y:e.y,vx:Math.cos(a)*185,vy:Math.sin(a)*185,r:5,c:'#cfd8dc'});
+ebullets.push({x:e.x,y:e.y,vx:Math.cos(a)*215,vy:Math.sin(a)*215,r:5,c:'#cfd8dc'}); /* v1.6.4: 215 (era 185) */
 }
 sfx.spit();sfx.growl();
 }
@@ -6428,10 +6723,10 @@ if(e.data.shots>=(kzH(e)?5:3)&&e.stT>=.9)mbEnd(e);
 }else if(e.pat==='swarm'){
 if(!e.data.fired){
 e.data.fired=true;
-const n=kzH(e)?12:8;
+const n=kzH(e)?16:8; /* v1.6.4: 16 perseguidores no kaizo (eram 12) */
 for(let i=0;i<n;i++){
 const a=i/n*TAU;
-ebullets.push({x:e.x+Math.cos(a)*30,y:e.y+Math.sin(a)*30,vx:Math.cos(a)*(kzH(e)?130:105),vy:Math.sin(a)*(kzH(e)?130:105),r:6,c:'#e6f0f2',home:kzH(e)?2:1.6,homeT:5});
+ebullets.push({x:e.x+Math.cos(a)*30,y:e.y+Math.sin(a)*30,vx:Math.cos(a)*(kzH(e)?160:105),vy:Math.sin(a)*(kzH(e)?160:105),r:6,c:'#e6f0f2',home:kzH(e)?2:1.6,homeT:5}); /* v1.6.4: 160 (era 130) */
 }
 sfx.howl();
 }
@@ -6440,9 +6735,10 @@ if(e.stT>=1)mbEnd(e);
 }
 /* ============ o carrasco da penumbra ============ */
 const EX_PATS=['axe','spin','quake','mines','charge','summon'];
-function exEnd(e){kzBossEnd(e,(kzH(e)?1.1:1.8)+rnd(.5));} /* v1.6.2: encadeia e respira como o bruxo */
+function exEnd(e){e.st='float';e.stT=0;e.atkT=(kzH(e)?.85:1.8)+rnd(.5);} /* v1.6.4: kaizo re-ataca 23% mais rápido */
 function exActStart(e){
-if(e.pat&&e.pat.indexOf('kz_')===0){(_kzStartMap[e.type]||function(){})(e);return;} /* v1.6.2 */
+/* v1.6.3: despacho dos padrões exclusivos kaizo (antes nunca eram lançados) */
+if(e.pat&&e.pat.indexOf('kz_')===0){(_kzStartMap[e.type]||function(){})(e);return;}
 if(e.pat==='axe')e.data={volleys:0,t:.1};
 else if(e.pat==='spin')e.data={t:0};
 else if(e.pat==='quake')e.data={salvo:0,t:.1};
@@ -6468,7 +6764,8 @@ sfx.roar();
 }
 function exActUpdate(e,dt){
 const pp=player;
-if(e.pat&&e.pat.indexOf('kz_')===0){(_kzUpdateMap[e.type]||function(){})(e,dt);return;} /* v1.6.2 */
+/* v1.6.3: despacho dos padrões exclusivos kaizo */
+if(e.pat&&e.pat.indexOf('kz_')===0){(_kzUpdateMap[e.type]||function(){})(e,dt);return;}
 if(e.pat==='axe'){
 e.data.t-=dt;
 const maxV=kzH(e)?4:3;
@@ -6526,7 +6823,6 @@ if(e.stT>=.6)exEnd(e);
 }
 function carrascoAI(e,dt,a,d,slowMul){
 e.stT+=dt;
-kzPhase2(e); /* v1.6.2: o pacote do BRUXO — FASE II aos 50% de vida */
 if(e.st==='float'){
 if(d>380){e.x+=Math.cos(a)*e.sp*slowMul*dt;e.y+=Math.sin(a)*e.sp*slowMul*dt;}
 else if(d<260){e.x-=Math.cos(a)*e.sp*slowMul*dt;e.y-=Math.sin(a)*e.sp*slowMul*dt;}
@@ -6534,30 +6830,33 @@ else{const pp=Math.sin(game.t*.7+e.seed);e.x+=-Math.sin(a)*e.sp*.7*pp*dt;e.y+=Ma
 e.ang=lerpAngle(e.ang,a,1-Math.exp(-3*dt));
 e.atkT-=dt;
 if(e.atkT<=0){
-/* v1.6.2: KAIZO como o BRUXO — sorteia também os padrões exclusivos (peso
-   maior na Fase II); fora do kaizo o ciclo antigo segue intacto */
+/* v1.6.3: os padrões EXCLUSIVOS kaizo agora entram no ciclo de TODOS os
+   minibosses — antes só o Bruxo sorteava os dele: o Carrasco, a Viúva e o
+   Golem tinham feitiços exclusivos prontos, mas NUNCA os lançavam. */
 if(e.kaizo){
-const exk=_kzPatsMap[e.type]||[];
-const exW=e.kzP2?.62:.4;
-e.pat=Math.random()<exW&&exk.length?exk[irnd(0,exk.length-1)]:EX_PATS[irnd(0,EX_PATS.length-1)];
-}else{
-e.patIdx=(e.patIdx+1)%EX_PATS.length;e.pat=EX_PATS[e.patIdx];
+/* v1.7.0: EDITOR DE MODS — a spell card vinculada substitui o sorteio */
+if(window.__MODS&&__MODS.on()&&__MODS.spellFor(e.type)){e.pat='kz_mod';}
+else{
+const ex=_kzPatsMap[e.type]||[],exW=e.kzP2?.62:.4;
+e.pat=(Math.random()<exW&&ex.length)?ex[irnd(0,ex.length-1)]:EX_PATS[irnd(0,EX_PATS.length-1)];
+if(e.kzP2&&_kzSignature[e.type]&&Math.random()<.45)e.pat=_kzSignature[e.type];
 }
-e.st='tele';e.stT=0;sfx.growl();
-if(e.kaizo)kzTeleMark(e);
+}else{e.patIdx=(e.patIdx+1)%EX_PATS.length;e.pat=EX_PATS[e.patIdx];}
+/* v1.7.1: EDITOR DE MODS — substituição de padrão (spell do mod / padrão do mod) */
+if(window.__MODS&&__MODS.on()&&e.pat!=='kz_mod'){const _ms=__MODS.takeover(e.type,e.pat);if(_ms){e._modSpell=_ms;e.pat='kz_mod';}}
+e.st='tele';e.stT=0;sfx.growl();if(e.kaizo)kzTeleMark(e);
 }
 }else if(e.st==='tele'){
-if(e.stT>=((kzH(e)?(e.kzP2?.4:.5):.7)*(e._neo?.6:1))){e.st=e.pat;e.stT=0;exActStart(e);}
+if(e.stT>=((kzH(e)?.5:.65)*(e._neo?.6:1))){e.st=e.pat;e.stT=0;exActStart(e);}
 }else exActUpdate(e,dt);
 clampArena(e,e.r);
 if(!player.dead&&d<e.r+(player.hitR||player.r)-4)hurtPlayer();
 }
 /* ============ A VIÚVA DA PENUMBRA ============ */
 const VI_PATS=['webspray','summon','dash','ring','snare'];
-function viEnd(e){kzBossEnd(e,(kzH(e)?.9:1.4)+rnd(.4));} /* v1.6.2: encadeia e respira como o bruxo */
+function viEnd(e){e.st='float';e.stT=0;e.atkT=(kzH(e)?.7:1.4)+rnd(.4);} /* v1.6.4: kaizo re-ataca 22% mais rápido */
 function viuvaAI(e,dt,a,d,slowMul){
 e.stT+=dt;
-kzPhase2(e); /* v1.6.2: o pacote do BRUXO — FASE II aos 50% de vida */
 if(e.st==='float'){
 if(d>340){e.x+=Math.cos(a)*e.sp*slowMul*dt;e.y+=Math.sin(a)*e.sp*slowMul*dt;}
 else if(d<240){e.x-=Math.cos(a)*e.sp*slowMul*dt;e.y-=Math.sin(a)*e.sp*slowMul*dt;}
@@ -6565,25 +6864,29 @@ else{const pp=Math.sin(game.t+e.seed);e.x+=-Math.sin(a)*e.sp*.8*pp*dt;e.y+=Math.
 e.ang=lerpAngle(e.ang,a,1-Math.exp(-3*dt));
 e.atkT-=dt;
 if(e.atkT<=0){
-/* v1.6.2: KAIZO como o BRUXO — padrões exclusivos no sorteio + telegrafo */
+/* v1.6.3: idem — a Viúva agora também sorteia os feitiços exclusivos kaizo */
 if(e.kaizo){
-const exk=_kzPatsMap[e.type]||[];
-const exW=e.kzP2?.62:.4;
-e.pat=Math.random()<exW&&exk.length?exk[irnd(0,exk.length-1)]:VI_PATS[irnd(0,VI_PATS.length-1)];
-}else{
-e.patIdx=(e.patIdx+1)%VI_PATS.length;e.pat=VI_PATS[e.patIdx];
+/* v1.7.0: EDITOR DE MODS — a spell card vinculada substitui o sorteio */
+if(window.__MODS&&__MODS.on()&&__MODS.spellFor(e.type)){e.pat='kz_mod';}
+else{
+const ex=_kzPatsMap[e.type]||[],exW=e.kzP2?.62:.4;
+e.pat=(Math.random()<exW&&ex.length)?ex[irnd(0,ex.length-1)]:VI_PATS[irnd(0,VI_PATS.length-1)];
+if(e.kzP2&&_kzSignature[e.type]&&Math.random()<.45)e.pat=_kzSignature[e.type];
 }
-e.st='tele';e.stT=0;sfx.growl();
-if(e.kaizo)kzTeleMark(e);
+}else{e.patIdx=(e.patIdx+1)%VI_PATS.length;e.pat=VI_PATS[e.patIdx];}
+/* v1.7.1: EDITOR DE MODS — substituição de padrão (spell do mod / padrão do mod) */
+if(window.__MODS&&__MODS.on()&&e.pat!=='kz_mod'){const _ms=__MODS.takeover(e.type,e.pat);if(_ms){e._modSpell=_ms;e.pat='kz_mod';}}
+e.st='tele';e.stT=0;sfx.growl();if(e.kaizo)kzTeleMark(e);
 }
 }else if(e.st==='tele'){
-if(e.stT>=((kzH(e)?(e.kzP2?.4:.5):.7)*(e._neo?.6:1))){e.st=e.pat;e.stT=0;viStart(e);}
+if(e.stT>=(.55*(e._neo?.6:1))){e.st=e.pat;e.stT=0;viStart(e);}
 }else viUpdate(e,dt);
 clampArena(e,e.r);
 if(!player.dead&&d<e.r+(player.hitR||player.r)-4)hurtPlayer();
 }
 function viStart(e){
-if(e.pat&&e.pat.indexOf('kz_')===0){(_kzStartMap[e.type]||function(){})(e);return;} /* v1.6.2 */
+/* v1.6.3: despacho dos padrões exclusivos kaizo (antes nunca eram lançados) */
+if(e.pat&&e.pat.indexOf('kz_')===0){(_kzStartMap[e.type]||function(){})(e);return;}
 if(e.pat==='webspray')e.data={n:0,t:.15};
 else if(e.pat==='summon')e.data={f:false};
 else if(e.pat==='dash')e.data={dashes:0,waitT:.3};
@@ -6592,7 +6895,8 @@ else if(e.pat==='snare')e.data={f:false};
 }
 function viUpdate(e,dt){
 const pp=player,hard=kzH(e);
-if(e.pat&&e.pat.indexOf('kz_')===0){(_kzUpdateMap[e.type]||function(){})(e,dt);return;} /* v1.6.2 */
+/* v1.6.3: despacho dos padrões exclusivos kaizo */
+if(e.pat&&e.pat.indexOf('kz_')===0){(_kzUpdateMap[e.type]||function(){})(e,dt);return;}
 if(e.pat==='webspray'){
 e.data.t-=dt;
 if(e.data.t<=0&&e.data.n<(hard?3:2)){
@@ -6666,36 +6970,39 @@ if(e.stT>=.7)viEnd(e);
 }
 /* ============ O GOLEM DE CINZAS ============ */
 const GZ_PATS=['beam','slam','rocks','charge','orbit'];
-function gzEnd(e){kzBossEnd(e,(kzH(e)?1.3:1.9)+rnd(.5));e.data={};} /* v1.6.2: encadeia e respira como o bruxo */
+function gzEnd(e){e.st='float';e.stT=0;e.atkT=(kzH(e)?1.0:1.9)+rnd(.5);e.data={};} /* v1.6.4: kaizo re-ataca 23% mais rápido */
 function golemAI(e,dt,a,d,slowMul){
 e.stT+=dt;
-kzPhase2(e); /* v1.6.2: o pacote do BRUXO — FASE II aos 50% de vida */
 if(e.st==='float'){
 if(d>380){e.x+=Math.cos(a)*e.sp*slowMul*dt;e.y+=Math.sin(a)*e.sp*slowMul*dt;}
 else{const pp=Math.sin(game.t*.6+e.seed);e.x+=-Math.sin(a)*e.sp*.6*pp*dt;e.y+=Math.cos(a)*e.sp*.6*pp*dt;}
 e.ang=lerpAngle(e.ang,a,1-Math.exp(-2*dt));
 e.atkT-=dt;
 if(e.atkT<=0){
-/* v1.6.2: KAIZO como o BRUXO — padrões exclusivos no sorteio + telegrafo */
+/* v1.6.3: idem — o Golem agora também sorteia os feitiços exclusivos kaizo */
 if(e.kaizo){
-const exk=_kzPatsMap[e.type]||[];
-const exW=e.kzP2?.62:.4;
-e.pat=Math.random()<exW&&exk.length?exk[irnd(0,exk.length-1)]:GZ_PATS[irnd(0,GZ_PATS.length-1)];
-}else{
-e.patIdx=(e.patIdx+1)%GZ_PATS.length;e.pat=GZ_PATS[e.patIdx];
+/* v1.7.0: EDITOR DE MODS — a spell card vinculada substitui o sorteio */
+if(window.__MODS&&__MODS.on()&&__MODS.spellFor(e.type)){e.pat='kz_mod';}
+else{
+const ex=_kzPatsMap[e.type]||[],exW=e.kzP2?.62:.4;
+e.pat=(Math.random()<exW&&ex.length)?ex[irnd(0,ex.length-1)]:GZ_PATS[irnd(0,GZ_PATS.length-1)];
+if(e.kzP2&&_kzSignature[e.type]&&Math.random()<.45)e.pat=_kzSignature[e.type];
 }
-e.st='tele';e.stT=0;sfx.growl();
-if(e.kaizo)kzTeleMark(e);
+}else{e.patIdx=(e.patIdx+1)%GZ_PATS.length;e.pat=GZ_PATS[e.patIdx];}
+/* v1.7.1: EDITOR DE MODS — substituição de padrão (spell do mod / padrão do mod) */
+if(window.__MODS&&__MODS.on()&&e.pat!=='kz_mod'){const _ms=__MODS.takeover(e.type,e.pat);if(_ms){e._modSpell=_ms;e.pat='kz_mod';}}
+e.st='tele';e.stT=0;sfx.growl();if(e.kaizo)kzTeleMark(e);
 }
 }else if(e.st==='tele'){
-if(e.stT>=((kzH(e)?(e.kzP2?.4:.5):.7)*(e._neo?.6:1))){e.st=e.pat;e.stT=0;gzStart(e);}
+if(e.stT>=(.7*(e._neo?.6:1))){e.st=e.pat;e.stT=0;gzStart(e);}
 }else gzUpdate(e,dt);
 clampArena(e,e.r);
 if(!player.dead&&d<e.r+(player.hitR||player.r)-4)hurtPlayer();
 }
 function gzStart(e){
-if(e.pat&&e.pat.indexOf('kz_')===0){(_kzStartMap[e.type]||function(){})(e);return;} /* v1.6.2 */
 const hard=kzH(e),pp=player;
+/* v1.6.3: despacho dos padrões exclusivos kaizo (antes nunca eram lançados) */
+if(e.pat&&e.pat.indexOf('kz_')===0){(_kzStartMap[e.type]||function(){})(e);return;}
 if(e.pat==='beam')e.data={beam:{ang:Math.atan2(pp.y-e.y,pp.x-e.x),t:0,dur:hard?2.8:2.2,warm:.6}};
 else if(e.pat==='slam')e.data={jumped:false,fell:false};
 else if(e.pat==='rocks')e.data={s:0,t:.1};
@@ -6709,7 +7016,8 @@ sfx.howl();
 }
 function gzUpdate(e,dt){
 const hard=kzH(e),pp=player;
-if(e.pat&&e.pat.indexOf('kz_')===0){(_kzUpdateMap[e.type]||function(){})(e,dt);return;} /* v1.6.2 */
+/* v1.6.3: despacho dos padrões exclusivos kaizo */
+if(e.pat&&e.pat.indexOf('kz_')===0){(_kzUpdateMap[e.type]||function(){})(e,dt);return;}
 if(e.pat==='beam'){
 const b=e.data.beam;
 b.t+=dt;
@@ -9573,14 +9881,7 @@ function drawDecor(){
  for(const d of game.decor){
   /* decorações do Falso Paraíso — estruturas religiosas */
   if(d.paradise){
-   /* v1.6.2: o limbo...? — SÓ NO CINZA as estruturas desenham sem cor e mais
-      apagadas (não é filtro de tela — é só nelas; balas, inimigos e o Thor
-      seguem com as cores deles). Nas fases 1-2 do limbo NADA muda (o filtro
-      em TODA a zona derrubava o fps — apanhado pelo harness). */
-   const _cinD=typeof limboCinza==='function'&&limboCinza();
-   if(_cinD){try{ctx.filter='saturate(.12) brightness(.8)';}catch(e){}}
    drawReligiousStructure(d);
-   if(_cinD){try{ctx.filter='none';}catch(e){}}
    continue;
   }
   ctx.save();
@@ -9731,7 +10032,7 @@ function drawDecor(){
 }
 /* ============ projéteis inimigos ============ */
 function updateEBullets(dt){
-const vmul=(game.hard?1.22:1)*(window.__RM_ebslow?window.__RM_ebslow():1)*(game._neoOn?1.3:1); /* v1.4.0 · v1.5.1: NEO — tiros 30% mais rápidos */
+const vmul=(game.hard?1.22:1)*(window.__RM_ebslow?window.__RM_ebslow():1)*(game._neoOn?1.3:1)*(game._kzRush?1.3:1); /* v1.4.0 · v1.5.1: NEO — tiros 30% mais rápidos · v1.6.4: A ENXURRADA — salas kaizo com balas 30% mais rápidas */
 for(let i=ebullets.length-1;i>=0;i--){
 const b=ebullets[i];
 /* tiro mortal do Triunfo da Morte */
@@ -9791,51 +10092,12 @@ const na=lerpAngle(cur,want,Math.min(1,b.home*dt));
 const sp=Math.hypot(b.vx,b.vy);
 b.vx=Math.cos(na)*sp;b.vy=Math.sin(na)*sp;
 }
-/* v1.6.1: comportamentos especiais das balas da SENTENÇA (b.jg) —
-   rastros que se desviam, círculos que giram, balas que param e mudam
-   de direção, balas que descem na diagonal. Cada uma é independente. */
-if(b.jg){
- const J=b.jg;
- if(J.w){ /* o círculo que gira (esquerda/direita) */
-  const ca=Math.cos(J.w*dt),sa=Math.sin(J.w*dt);
-  const nvx=b.vx*ca-b.vy*sa;
-  b.vy=b.vx*sa+b.vy*ca;b.vx=nvx;
- }
- if(J.t!==undefined){ /* o RASTRO — depois de um tempo, desvia em direção variada */
-  J.t-=dt;
-  if(J.t<=0){
-   J.t=undefined;
-   const n=J.n||1;
-   for(let k=0;k<n;k++){
-    if(ebullets.length>480)break;
-    const a=rnd(TAU);
-    ebullets.push({x:b.x,y:b.y,vx:Math.cos(a)*175,vy:Math.sin(a)*175,r:4,c:J.c||'#ff3d5e',dmg:10,rm:1,life:5});
-   }
-   try{blip('sine',900,520,.045,.03);}catch(e){}
-  }
- }
- if(J.stop!==undefined){ /* a LENTA que para e muda de direção */
-  J.stop-=dt;
-  if(J.stop<=0){
-   if(J.pause===undefined){J.pause=.5;b.vx=0;b.vy=0;J.sp0=J.sp0||175;}
-   else{
-    J.pause=undefined;
-    const a=(J.mode==='aim'&&!player.dead)?Math.atan2(player.y-b.y,player.x-b.x):rnd(TAU);
-    b.vx=Math.cos(a)*(J.sp0||175);b.vy=Math.sin(a)*(J.sp0||175);
-    J.stop=undefined;
-    try{blip('sine',1250,760,.04,.02);}catch(e){}
-   }
-  }
- }
- if(J.fall!==undefined){ /* a VERDE que desce na diagonal */
-  J.fall-=dt;
-  if(J.fall<=0){
-   J.fall=undefined;
-   b.vx=(b.vx>=0?1:-1)*125;b.vy=200;
-   try{blip('triangle',520,270,.05,.03);}catch(e){}
-  }
- }
-}
+/* v1.7.0: EDITOR DE MODS — speedMul da bala (aplica 1× por bala) */
+if(!b._mk&&window.__MODS&&__MODS.on()){b._mk=1;const _sm=__MODS.speedFor(b.c);if(_sm&&_sm!==1){b.vx*=_sm;b.vy*=_sm;}}
+/* v1.7.2: EDITOR DE MODS — BUFF/NERF por padrão (aplica 1× por bala): a bala
+   nasce marcada com _tp (o padrão que a soltou, via tagBullets) e recebe UMA
+   vez o multiplicador de velocidade do tuning do mod ativo */
+if(!b._tk&&b._tp&&window.__MODS&&__MODS.on()){b._tk=1;const _tn=__MODS.tuneFor(b._tt,b._tp);if(_tn&&_tn.sp&&_tn.sp!==1){b.vx*=_tn.sp;b.vy*=_tn.sp;}}
 b.x+=b.vx*vmul*dt;b.y+=b.vy*vmul*dt;
 /* v1.4.3: as balas da SENTENÇA (b.rm) NÃO são cortadas pelos limites da sala —
    quando o Cérbero novo alcança a parte escura fora do mapa, os pescoços
@@ -9843,9 +10105,17 @@ b.x+=b.vx*vmul*dt;b.y+=b.vy*vmul*dt;
    Essas balas já expiram sozinhas pelo life próprio. */
 if(!b.rm&&(b.x<ROOM.x-44||b.x>ROOM.x+ROOM.w+44||b.y<ROOM.y-44||b.y>ROOM.y+ROOM.h+44)){ebullets.splice(i,1);continue;}
 if(!b.fake&&!player.dead&&dist(b.x,b.y,player.x,player.y)<b.r+(player.hitR||player.r)-2){
+const _pi=player.inv; /* v1.6.4: a cura do morcego só vale se o golpe acertou de verdade */
 hurtPlayer();
 if(b.c==='#9fd8ff'||b.slowShot)player.slowT=Math.max(player.slowT,.8);
+if(window.__GRI)window.__GRI.bulletHit(b); /* v1.9.0: balas inimigas aplicam efeitos ao Thor (queimadura/veneno) + selo da vigília */
 sparks(b.x,b.y,b.c,5,160,.4,3,true);
+/* v1.6.4: ENXAME VAMPIRO — morcego acertou o Thor? O Carrasco se CURA */
+if(b.heal&&b.owner&&!b.owner.dead&&_pi<=0&&player.inv>_pi){
+b.owner.hp=Math.min(b.owner.maxHp,b.owner.hp+b.heal);
+texts.push({x:b.owner.x,y:b.owner.y-b.owner.r-14,txt:'+'+b.heal,t:0,life:.9,c:'#7fe08a',size:11,disp:true});
+sparks(b.owner.x,b.owner.y,'#7fe08a',10,180,.55,3,true);
+}
 ebullets.splice(i,1);
 }
 }
@@ -9906,7 +10176,7 @@ const s=spawnMarks[i];
 s.t+=dt*(game.hard?1.25:1);
 if(s.t>=s.dur){
 /* marcas falsas (sombras) só geram o efeito visual, sem inimigo real */
-if(!s.fake)spawnEnemy(s.type,s.x,s.y,s.kaizo);
+if(!s.fake)spawnEnemy(s.type,s.x,s.y,s.kaizo,s._hpMul);
 sparks(s.x,s.y,'#5a2430',8,170,.5,3.5);
 sparks(s.x,s.y,'#ff8f3d',5,200,.4,2.5,true);
 blip('sawtooth',70,40,0.18,0.06);
@@ -9933,8 +10203,22 @@ const magnet=130*P.magnetMult;
 for(let i=pickups.length-1;i>=0;i--){
 const p=pickups[i];p.t+=dt;if(p.noPickT>0)p.noPickT-=dt; /* v1.3.1: janela sem coleta */
 /* FIX v0.9.9: bênções/itens no chão NÃO expiram mais (era 11s — o pedestal
-   da sala de tesouro sumia antes de poder pegar) */
-if(p.t>11&&p.type!=='chest'&&p.type!=='kingsoul'&&p.type!=='knightrelic'&&p.type!=='blessing_drop'&&p.type!=='active_drop'&&p.type!=='fagulha'){pickups.splice(i,1);continue;}
+   da sala de tesouro sumia antes de poder pegar). v1.6.0: ALMAS E VIDA
+   TAMBÉM NÃO expiram mais — nada no chão desaparece pelo tempo. */
+if(p.t>11&&p.type!=='chest'&&p.type!=='kingsoul'&&p.type!=='knightrelic'&&p.type!=='blessing_drop'&&p.type!=='active_drop'&&p.type!=='fagulha'&&p.type!=='soul'&&p.type!=='heart'){pickups.splice(i,1);continue;}
+/* v1.6.3: NADA EM CIMA DA PAREDE — bênção, pacto, coração, almas, fagulha...
+   se o drop nascer ou acabar DENTRO da parede, ele desliza sozinho de volta
+   para o chão jogável; se estiver totalmente FORA do mapa, retorna ao MEIO
+   da sala. Roda todo quadro: nenhum item fica perdido onde a mão não alcança. */
+if(!inRoomXY(p.x,p.y,24)){
+let nd=1e18;
+for(const rc of game.absRects){
+const cx=clamp(p.x,rc.x,rc.x+rc.w),cy=clamp(p.y,rc.y,rc.y+rc.h);
+nd=Math.min(nd,(p.x-cx)*(p.x-cx)+(p.y-cy)*(p.y-cy));
+}
+if(nd>3600){const mm=game.absMain;if(mm){p.x=mm.x+mm.w/2;p.y=mm.y+mm.h/2;}}
+else{const np=roomPt(p.x,p.y,24);p.x=np.x;p.y=np.y;}
+}
 if(p.type==='soul'&&!player.dead){
 const dx=player.x-p.x,dy=player.y-p.y,d=Math.hypot(dx,dy);
 if(d<magnet&&d>1){const sp=60+(magnet-d)*8;p.x+=dx/d*sp*dt;p.y+=dy/d*sp*dt;}
@@ -10018,6 +10302,8 @@ continue;
     pickups.splice(i,1);
     sparks(p.x,p.y,'#ffd9a0',18,240,.7,3,true);
     game.flash=Math.max(game.flash,.2);
+    game._blessGateHint=false;
+    checkFullSweep(); /* v1.6.3: pegou a bênção → o portal pode nascer agora */
     if(p.dropType==='upgrade'){
       const u=UPGRADES.find(x=>x.id===p.dropId);
       if(u&&u.can()){
@@ -10270,7 +10556,7 @@ const UPGRADES=[
 {id:'coracaofalso',q:3,glyph:'blood',name:'CORAÇÃO FALSO',max:1,desc:'+40% dano — mas você perde 10 HP a cada sala limpa.',can:function(){return!game.up.coracaofalso;},apply:function(){P.dmgMult*=1.4;game.up.coracaofalso=1;}},
 {id:'vendaval',q:2,glyph:'wind',name:'VENDAVAL',max:1,desc:'+50% velocidade — mas inimigos também são 30% mais rápidos.',can:function(){return!game.up.vendaval;},apply:function(){P.speedMult*=1.5;game.up.vendaval=1;}},
 {id:'olhogordo',q:3,glyph:'eye',name:'OLHO GORDO',max:1,desc:'+60% dano — mas você toma 50% mais dano.',can:function(){return!game.up.olhogordo;},apply:function(){P.dmgMult*=1.6;game.up.olhogordo=1;}},
-{id:'pactofome',q:4,glyph:'fangs',name:'PACTO DA FOME',max:1,desc:'dano triplica — mas você perde 5 HP por segundo.',can:function(){return game.hasBite&&!game.up.pactofome;},apply:function(){P.dmgMult*=3;game.up.pactofome=1;game.fomeDrain=true;}},
+{id:'pactofome',q:4,glyph:'fangs',name:'PACTO DA FOME',max:1,desc:'dano triplica — mas você recebe 25% mais dano. a fome agora morde de volta (v1.9.0: nunca mais drena vida).',can:function(){return game.hasBite&&!game.up.pactofome;},apply:function(){P.dmgMult*=3;game.up.pactofome=1;game.gri_fomeDmg=1;}},
 {id:'cargapedra',q:2,glyph:'reach',name:'CARGA DE PEDRA',max:1,desc:'+50% alcance — mas você é 20% mais lento e desvio 40% mais devagar.',can:function(){return!game.up.cargapedra;},apply:function(){P.reachMult*=1.5;P.speedMult*=0.8;P.dashCdMult*=1.4;game.up.cargapedra=1;}},
 {id:'espelho',q:5,glyph:'dark',name:'ESPELHO QUEBRADO',max:1,desc:'parece bom: +30% dano. realidade: cada hit inimigo tem 15% chance de ser crítico (50 dano).',can:function(){return!game.up.espelho;},apply:function(){P.dmgMult*=1.3;game.up.espelho=1;}},
 /* v0.9.6: outras bênçãos enganosas */
@@ -10278,7 +10564,7 @@ const UPGRADES=[
 {id:'vidro',q:3,glyph:'shard',name:'CORPO DE VIDRO',max:1,desc:'+70% de dano — mas você morre em 2 hits (cada hit tira 50 HP).',can:function(){return!game.glassBody;},apply:function(){game.glassBody=true;P.dmgMult*=1.7;}},
 {id:'pressa',q:2,glyph:'wind',name:'PRESSA CEGA',max:1,desc:'+35% velocidade de ataque — mas seus tiros erram 25% do tempo.',can:function(){return!game.blindHaste;},apply:function(){game.blindHaste=true;P.rateMult*=1.35;}},
 {id:'isolamento',q:4,glyph:'dark',name:'ISOLAMENTO',max:1,desc:'+50% de dano — mas almas não são mais atraídas. você está só.',can:function(){return!game.isolation;},apply:function(){game.isolation=true;P.dmgMult*=1.5;P.magnetMult=0;}},
-{id:'fomeinsaciavel',q:3,glyph:'fangs',name:'FOME INSCIÁVEL',max:1,desc:'+30% de dano — mas você perde 5 HP a cada 10 segundos. a fome consome.',can:function(){return!game.endlessHunger;},apply:function(){game.endlessHunger=true;P.dmgMult*=1.3;game.hungerT=0;}}
+{id:'fomeinsaciavel',q:3,glyph:'fangs',name:'FOME INSCIÁVEL',max:1,desc:'+30% de dano — mas a fome devora 5 almas a cada 10 segundos (nunca vida).',can:function(){return!game.endlessHunger;},apply:function(){game.endlessHunger=true;P.dmgMult*=1.3;game.hungerT=0;}}
 ];
 /* ============ poderes únicos: 3 bênçãos do mesmo tipo ============
    Ao empilhar 3 níveis de um mesmo elemento/arma, thor desperta um dom único
@@ -10494,7 +10780,7 @@ const out=[];
 const nCho=Math.random()<.4?1:2;
 while(out.length<nCho&&pool.length){
 let tot=0;
-const ws=pool.map(function(u){const w=QUAL_W[u.q-1]||1;tot+=w;return w;}); /* v1.4.2: q fora da tabela (PACTO 404 q7) pesa 1 em vez de NaN */
+const ws=pool.map(function(u){let w=QUAL_W[u.q-1]||1;if(window.__GRI&&window.__GRI.pactW)w*=window.__GRI.pactW(u);tot+=w;return w;}); /* v1.4.2: q fora da tabela (PACTO 404 q7) pesa 1 · v1.9.0: pactos bem mais raros, feixes controlados pelo grimório */
 let r=rnd(tot),idx=0;
 for(;idx<pool.length;idx++){r-=ws[idx];if(r<=0)break;}
 idx=Math.min(idx,pool.length-1);
@@ -11248,7 +11534,8 @@ game.roomFade=Math.max(0,game.roomFade-dt*1.5);
 /* v0.9.7: decrementa o timer do glitch do Observador */
 if(game.glitchT>0)game.glitchT=Math.max(0,game.glitchT-dt);
 for(const a of ambient){a.y+=a.vy*dt;if(a.y<-12){a.y=H+12;a.x=rnd(W);}}
-metaTick();
+/* v1.9.1 DESEMPENHO: metaTick SAIU daqui — rodava ~60x/s (loop de relíquias
+   + conquistas por frame). O timer de 2s do laço principal cobre tudo. */
 }
 /* ============ IA do Cérbero ============ */
 const TELE_DUR={fan:.75,spiral:.9,charge:.85,howl:.7,geyser:.6,summon:.65,pulse:.7,meteor:.8,curtain:.8,blink:.6,mines:.7,souls:.7,wall:.85,cross:.9,ring:.7,pounce:.55,wave:.8,orbit:.9,snipe:.7,volley:.85,crosshair:.75,nova:.7,whirl:.9,beam:.95,fountain:.7,chain:.75,aura:.9,rain:.8};
@@ -11496,6 +11783,7 @@ advanceActiveHead();
 }
 if(alive===2&&!boss.phase2){
 boss.phase2=true;
+boss.frenzyCd=2.5;
 game.banner={type:'boss',txt:'FASE II — FÚRIA DO GUARDIÃO',sub:'as cabeças restantes despertam — turnos rotativos',t:0,dur:2.6};
 sfx.roar();sfx.howl();
 game.flash=.4;game.shake=18;
@@ -12139,25 +12427,32 @@ const phase=boss.heads.filter(function(h){return h.alive;}).length;
 if(!boss.introLock)boss.scale=Math.min(1,boss.scale+dt*2.4);
 const p2m=boss.phase2?1.35:1;
 const spd=(phase===3?(game.hard?30:24):phase===2?(game.hard?42:34):(game.hard?58:48))*p2m;
-if(phase===1&&!boss.introLock){
-/* v1.6.0: O FRENESI SAIU — no lugar dele, O ANEL QUE ACELERA: na última
-cabeça o guardião não investe mais; ele cospe UM CÍRCULO DE TIROS cuja
-cadência sobe A CADA SEGUNDO (o intervalo encolhe .18s/s até o piso .45s),
-sem exaustão e sem pausa — o cerco aperta até o fim. */
-boss.ringAcc+=dt;
-if(boss.ringAcc>=1){boss.ringAcc-=1;boss.ringInt=Math.max(.45,boss.ringInt-.18);}
-boss.ringT+=dt;
-if(boss.ringT>=boss.ringInt){
-boss.ringT=0;
-if(ebullets.length<430){
-const n=16,off=rnd(TAU);
-for(let i=0;i<n;i++){
-const a=off+i/n*TAU;
-ebullets.push({x:boss.x,y:boss.y-20,vx:Math.cos(a)*175,vy:Math.sin(a)*175,r:5.5,c:'#d9465a'});
+if(phase===1&&!boss.introLock&&!boss.frenzyActive){
+boss.frenzyCd-=dt;
+if(boss.frenzyCd<=0){
+boss.frenzyActive=true;boss.frenzyT=0;boss.frenzyPause=0;boss.dashing=false;
+game.banner={type:'small',txt:'FRENESI DO GUARDIÃO',sub:'',t:0,dur:1.5};
+sfx.roar();sfx.howl();game.flash=.25;game.shake=16;
 }
-try{sfx.growl();blip('square',900,1400,.08,.05);}catch(e){}
-game.shake=Math.max(game.shake,4);
 }
+if(boss.frenzyActive){
+boss.frenzyT+=dt;
+if(!boss.dashing){
+boss.frenzyPause-=dt;
+if(boss.frenzyPause<=0){
+boss.dashing=true;boss.dashT=.38;
+boss.dashAng=Math.atan2(player.y-boss.y,player.x-boss.x);
+const v=game.hard?1260:1080;
+boss.dashVx=Math.cos(boss.dashAng)*v;boss.dashVy=Math.sin(boss.dashAng)*v;
+sfx.dash();sfx.growl();
+}
+}
+if(boss.frenzyT>=frenzyDur()){
+boss.frenzyActive=false;boss.frenzyCd=game.hard?7:9;boss.frenzyT=0;
+boss.dashing=false;boss.recoverT=1.6;
+game.banner={type:'small',txt:'O GUARDIÃO ESTÁ EXAUSTO',sub:'',t:0,dur:1.5};
+sfx.explode();game.shake=20;
+sparks(boss.x,boss.y,'#31242e',22,280,.7,5);
 }
 }
 if(boss.dashing){
@@ -12169,13 +12464,13 @@ if(!player.dead&&dist(boss.x,boss.y,player.x,player.y)<boss.r*.82+(player.hitR||
 const m=boss.r+30;
 if(boss.x<m||boss.x>W-m||boss.y<m||boss.y>H-m||boss.dashT<=0){
 boss.dashing=false;
-boss.recoverT=.85;
-game.shake=Math.max(game.shake,18);
+boss.recoverT=boss.frenzyActive?.12:.85;
+game.shake=Math.max(game.shake,boss.frenzyActive?10:18);
 sfx.explode();
 sparks(boss.x,boss.y,'#31242e',16,260,.6,5);
 }
 clampArena(boss,boss.r*.6);
-}else{
+}else if(!boss.frenzyActive){
 boss.recoverT-=dt;
 if(boss.recoverT<=0&&!boss.introLock){
 const a=Math.atan2(player.y-boss.y,player.x-boss.x);
@@ -12184,6 +12479,8 @@ boss.x+=Math.cos(boss.angle)*spd*dt;boss.y+=Math.sin(boss.angle)*spd*dt;
 }else if(boss.recoverT>0){
 boss.angle+=Math.sin(game.t*6)*.012;
 }
+clampArena(boss,boss.r*.6);
+}else{
 clampArena(boss,boss.r*.6);
 }
 if(!boss.introLock){
@@ -12222,8 +12519,13 @@ if(howl>0&&Math.random()<dt*24)particles.push({x:h.hx+Math.cos(h.face)*30,y:h.hy
 continue;
 }
 if(boss.frenzyActive){
-/* v1.6.0: o frenesi não existe mais — este ramo nunca roda (mantido por
-   segurança de estado antigo; as cabeças seguem o headAI normal) */
+const a=boss.angle+h.baseAng;
+h.tx=boss.x+Math.cos(a)*(boss.r+40);h.ty=boss.y+Math.sin(a)*(boss.r+40);
+h.vx+=((h.tx-h.hx)*70-h.vx*10)*dt;h.vy+=((h.ty-h.hy)*70-h.vy*10)*dt;
+h.hx+=h.vx*dt;h.hy+=h.vy*dt;
+h.face=lerpAngle(h.face,boss.dashing?boss.dashAng:Math.atan2(player.y-h.hy,player.x-h.hx),1-Math.exp(-9*dt));
+h.mouth=1;
+if(!player.dead&&dist(h.hx,h.hy,player.x,player.y)<h.r+player.r-6)hurtPlayer();
 continue;
 }
 headAI(h,dt,phase);
@@ -12598,7 +12900,6 @@ if(Math.random()<.25){
 /* Thor à esquerda esperando */
 if(game.playerAlpha===undefined)game.playerAlpha=1;
 drawPlayer();
-drawPlayerHitbox(); /* v1.6.2 */
 /* v0.9.3: Caronte só fala quando conversado — sem balão de cantarola aqui */
 /* prompt de interação — "interagir [Z]" quando perto */
 if(game.caronteInteractable&&!game.caronteChoicesOpen){
@@ -12674,12 +12975,15 @@ if(ph==='approach'){
   player.x=lerp(W*.62,W*.5,smooth(k));
   player.y=lerp(H*.68,H*.85,smooth(k));
   if(game.boatT>=2.0){
-    /* v1.6.0: O CORREDOR VOLTOU — o barco atraca e o Thor desce num CORREDOR
-       ESCURO que ele atravessa como quem passa por uma porta (sem portal
-       nenhum: caminhou até o fim, o LIMBO se revela — enterLimboOfficial
-       pelo caminho de sempre do updateCorridor). A lição v1.4.5 segue:
-       startLimboCorridor já sai do estado 'boatride' ANTES de montar o limbo. */
-    startLimboCorridor();
+    /* v1.3.0: o barco atraca direto no LIMBO — o corredor azulado ficou ANTES do rio */
+    /* v1.4.5 CORREÇÃO CRÍTICA: enterRoom NÃO troca o game.state — no caminho
+       antigo (corredor) o estado já era 'play' antes de chamar
+       enterLimboOfficial, mas aqui o estado ficava PRESO em 'boatride' para
+       sempre: a cena do barco continuava eternamente e, em arrive>1.5s, Thor
+       nem é desenhado — ele "sumia" e o LIMBO nunca chegava. O estado sai de
+       'boatride' ANTES de montar o limbo (mesma ordem do caminho do corredor). */
+    game.state='play';
+    enterLimboOfficial();
   }
 }
 /* partículas de névoa e água durante a viagem */
@@ -13451,7 +13755,6 @@ if(cb){
 drawEBullets();
 for(const e of enemies)drawEnemy(e);
 drawPlayer();
-drawPlayerHitbox(); /* v1.6.2 */
 drawBullets();
 drawVapers();drawBeamShots();drawBeamCharge();/* v1.0.0: vapor/feixe na cena do Caronte */
 drawParticles();
@@ -14189,7 +14492,10 @@ for(const p of pickups){if(p.type==='soul')souls++;else if(p.type==='heart')hear
 /* v0.9.16 sinergia LUZ VITAL — corações curam o dobro */
 const heartMul=game.psyn.luzvital?2:1;
 if(hearts>0&&player.hp<player.maxHp){player.hp=Math.min(player.maxHp,player.hp+hearts*25*heartMul);sfx.heart();}
-pickups=pickups.filter(function(p){return p.type==='chest'||p.type==='kingsoul'||p.type==='knightrelic';});
+/* v1.6.0: A VARREDURA NÃO APAGA MAIS ITENS — bênçãos, pactos (itens ativos),
+   fagulhas e a própria alma/vida continuam no chão quando a sala limpa.
+   Baú, alma do rei e relíquia do cavaleiro seguem como eram. */
+pickups=pickups.filter(function(p){return p.type==='chest'||p.type==='kingsoul'||p.type==='knightrelic'||p.type==='blessing_drop'||p.type==='active_drop'||p.type==='fagulha'||p.type==='soul'||p.type==='heart';});
 if(souls>0)gainSouls(souls);
 }
 function roomCleared(){
@@ -14199,12 +14505,11 @@ r.cleared=true;
 game.waveState='done';
 collectRoomPickups();
 openDoors();
-/* v0.9.6: CORAÇÃO FALSO — perde 10 HP a cada sala limpa */
+/* v0.9.6: CORAÇÃO FALSO — v1.9.0: nunca mais tira vida. Agora ele PESA:
+   cadência reduzida por 4s a cada sala limpa (drenagem removida). */
 if(game.up.coracaofalso){
-  player.hp-=10;
-  texts.push({x:player.x,y:player.y-30,txt:'-10 (coração falso)',t:0,life:1,c:'#d9465a',size:12,disp:true});
-  sparks(player.x,player.y,'#d9465a',6,160,.4,2.5,true);
-  if(player.hp<=0){player.hp=0;player.dead=true;game.state='dead';game.deadT=0;game.overlayShown=false;META.deaths++;saveMeta();sfx.die();}
+  game.gri_falsoT=4;
+  texts.push({x:player.x,y:player.y-30,txt:'o coração falso pesa (cadência -33% · 4s)',t:0,life:1,c:'#d9465a',size:11,disp:true});
 }
 /* ==== v0.9.0: se o jogador recusou Caronte antes, o portal do miniboss
    o leva de volta ao encontro com o barqueiro. ==== */
@@ -14267,12 +14572,12 @@ game.shopItems.push({name:'CORAÇÃO',desc:'recupera 1 coração — se estiver 
 /* v1.0.0: a FAGULHA EXPLOSIVA entra no estoque do ERRANTE — a porta rachada
    exige uma. Errar a compra é ficar fora dos segredos da descida. */
 game.shopItems.push({name:'FAGULHA EXPLOSIVA',desc:'brasa explosiva — dispare com [Q]',price:shopPrice(16,disc),kind:'fagulha',bought:false});
-const pool=UPGRADES.filter(u=>u.can()&&u.q<=2&&!u.id.startsWith('unlock'));
+const pool=UPGRADES.filter(u=>u.can()&&u.q<=2&&!u.id.startsWith('unlock')&&PACT_IDS.indexOf(u.id)<0); /* v1.9.0: pactos saíram do básico da feira */
 for(let si=0;si<3&&pool.length;si++){
 const u=pick(pool);pool.splice(pool.indexOf(u),1);
 game.shopItems.push({name:u.name,desc:u.desc,price:shopPrice(14+si*4,disc),kind:'upg',up:u,bought:false});
 }
-const pool2=UPGRADES.filter(u=>u.can()&&u.q===3&&u.id!=='olho');
+const pool2=UPGRADES.filter(u=>u.can()&&u.q===3&&u.id!=='olho'&&(PACT_IDS.indexOf(u.id)<0||Math.random()<.25)); /* v1.9.0: pacto raro na feira só 25% das vezes */
 /* v0.9.14: bênção RARA do ERRANTE — forte, então MUITO cara (90–135 almas) */
 if(pool2.length&&Math.random()<.7){const u=pick(pool2);game.shopItems.push({name:u.name,desc:u.desc,price:shopPrice(90+irnd(0,45),disc),kind:'upg',up:u,strong:true,bought:false});}
 if(!game.hasShot){const u=UPGRADES.find(x=>x.id==='unlockShot');if(u)game.shopItems.push({name:'ARMA: TROVÃO À DISTÂNCIA',desc:'desbloqueia o tiro — projéteis que caçam à distância',price:shopPrice(140,disc),kind:'upg',up:u,strong:true,bought:false});}
@@ -14622,6 +14927,13 @@ const bob=Math.sin(game.t*1.6)*6;
 const cx=W/2,cy=H*.36+bob;
 ctx.save();
 ctx.globalAlpha=a;
+/* v1.6.1: A BESTA TEM ROSTO — se existir assets/sprites/besta.png (ou
+   besta-das-trevas.png, fera.png…), a arte do usuário substitui a besta
+   vetorial INTEIRA (chifres + cabeça + olhos em brasa + sorriso). O texto
+   de provação e a assinatura seguem logo abaixo. Sem o arquivo, o desenho
+   original vale — nada quebra, nunca fica invisível. */
+const __bp=window.THOR_PNG_MODE&&window.THOR_PNG&&window.THOR_PNG.drawBesta?window.THOR_PNG.drawBesta(ctx,cx,cy,{alpha:a,bob:bob}):false;
+if(!__bp){
 /* chifres curvos */
 for(const s of[-1,1]){
 ctx.beginPath();
@@ -14658,6 +14970,7 @@ const py=cy+52+(i%2?10:0);
 if(i===0)ctx.moveTo(px,py);else ctx.lineTo(px,py);
 }
 ctx.stroke();
+}/* fim besta vetorial — com besta.png, a arte do usuário entrou no lugar */
 /* frase da bestia */
 const taunt=game.deadTaunt||DEATH_TAUNTS[0];
 const n=Math.floor(clamp((t-.7)/.5,0,1)*taunt.length);
@@ -14778,12 +15091,19 @@ ctx.save();
 ctx.globalAlpha=pa*flick;
 ctx.fillStyle='rgba(0,0,0,0.35)';
 ctx.beginPath();ctx.ellipse(p.x,p.y+10,15*fs,5*fs,0,0,TAU);ctx.fill();
-/* v1.4.6→v1.6.4: O PONTO VERMELHO mudou de lugar e de regra — é desenhado
-   POR CIMA do corpo (drawPlayerHitbox, chamado depois do sprite em cada
-   cena): antes ele nascia AQUI, antes do corpo, e ficava escondido EMBAIXO
-   do Thor — por isso ninguém via. A v1.6.2 subiu a hitbox (5→8) e deixava
-   o ponto sempre visível; a v1.6.4 DIMINUIU de volta (8→5, tamanho de um
-   tiro) e o ponto SÓ aparece SEGURANDO SHIFT (foco). */
+/* v1.4.6: FOCO (SHIFT segurado) — a hitbox de verdade aparece: um círculo de
+   4px (v1.6.0) com o ponto carmesim no centro. Só com SHIFT — sem ele, nada
+   de círculo. Andar fica lento. */
+if(p.focus&&!p.dead){
+ctx.save();ctx.globalAlpha=Math.max(.35,pa);
+ctx.strokeStyle='rgba(255,255,255,.95)';ctx.lineWidth=1.4;
+ctx.beginPath();ctx.arc(p.x,p.y,p.hitR||5,0,TAU);ctx.stroke();
+ctx.strokeStyle='rgba(255,46,85,.5)';ctx.lineWidth=1;
+ctx.beginPath();ctx.arc(p.x,p.y,(p.hitR||5)+3.5,0,TAU);ctx.stroke();
+ctx.fillStyle='#ff2e55';
+ctx.beginPath();ctx.arc(p.x,p.y,1.8,0,TAU);ctx.fill();
+ctx.restore();
+}
 /* PNG EDITION: o Thor vivo usa um sprite externo editável.
    O Canvas continua como fallback caso o PNG ainda esteja carregando.
    v0.9.10 FIX: restore() antes do return — o save() de cima vazava o
@@ -14843,37 +15163,6 @@ ctx.globalAlpha=pa*flick*(.3+.25*Math.sin(game.t*6+s));
 ctx.beginPath();ctx.arc(11,s*3.6,3.6,0,TAU);ctx.fill();
 ctx.globalAlpha=pa*flick;
 }
-ctx.restore();
-}
-/* ============ v1.6.4: O PONTO VERMELHO SÓ NO SHIFT ============
-   A hitbox DIMINUIU de volta ao tamanho de um tiro (player.hitR, 8→5).
-   O disco vermelho — desenhado DEPOIS do corpo do Thor (por cima do
-   sprite, PNG ou vetor) — SÓ APARECE SEGURANDO SHIFT (o foco, v1.4.6):
-   sem a tecla, NADA de ponto sobre o Thor; com a tecla, o disco tem o
-   TAMANHO EXATO da hitbox de dano + anéis pulsantes — o que você vê é
-   exatamente onde o dano acontece. */
-function drawPlayerHitbox(){
-if(game.state==='menu'||game.state==='e404intro'||game.state==='reiintro')return;
-const p=player;
-if(!p||p.dead)return;
-if(!(p.focus||held('dash')))return; /* v1.6.4: SÓ com SHIFT (foco) — sem a tecla o ponto NÃO desenha */
-const pa=game.playerAlpha;if(pa<=0)return;
-const flick=(p.inv>0&&p.dashT<=0&&Math.floor(game.t*18)%2===0)?.4:1;
-const R=p.hitR||5;
-ctx.save();
-ctx.globalAlpha=Math.max(.55,pa)*flick;
-ctx.fillStyle='#ff1f1f';
-ctx.beginPath();ctx.arc(p.x,p.y,R,0,TAU);ctx.fill();
-ctx.fillStyle='rgba(255,132,132,.9)';
-ctx.beginPath();ctx.arc(p.x-R*.28,p.y-R*.28,R*.34,0,TAU);ctx.fill();
-ctx.strokeStyle='rgba(255,255,255,.95)';ctx.lineWidth=1.6;
-ctx.beginPath();ctx.arc(p.x,p.y,R,0,TAU);ctx.stroke();
-/* anéis de foco (SHIFT) — o disco já nasce sob a tecla */
-const pu=.5+.5*Math.sin(game.t*6);
-ctx.strokeStyle='rgba(255,46,85,'+(.35+.3*pu)+')';ctx.lineWidth=1.3;
-ctx.beginPath();ctx.arc(p.x,p.y,R+4.5+pu*1.8,0,TAU);ctx.stroke();
-ctx.strokeStyle='rgba(255,255,255,.55)';ctx.lineWidth=1;
-ctx.beginPath();ctx.arc(p.x,p.y,R+8.5,0,TAU);ctx.stroke();
 ctx.restore();
 }
 function drawChainsaw(){
@@ -15002,7 +15291,7 @@ if(tg.shape==='line'||tg.shape==='cross'){
   ctx.globalAlpha=blink*.75;
   ctx.strokeStyle=tg.c;ctx.lineWidth=3;
   ctx.setLineDash([10,7]);
-  const L=1400;
+  const L=tg.tlen||1400; /* v1.6.3: fios da morte usam segmentos com comprimento próprio */
   if(tg.shape==='cross'){
     for(const k of [0,Math.PI/2]){
       ctx.beginPath();
@@ -15670,6 +15959,25 @@ const a=e.ang+(k-1.5)*.22;
 ctx.beginPath();ctx.arc(Math.cos(a)*e.r*.45,Math.sin(a)*e.r*.45,2.4,0,TAU);ctx.fill();
 }
 ctx.restore();
+/* v1.6.3: FIOS DA MORTE — os fios ficam visíveis: finos antes de tensionar,
+   esticados e brilhando enquanto CORTAM, sumindo quando a vida acaba */
+if(e.st==='kz_threads'&&e.data&&e.data.threads){
+for(const th of e.data.threads){
+  if(!th.cut){
+    ctx.globalAlpha=.55;ctx.strokeStyle='#dfe7ee';ctx.lineWidth=1.2;
+    ctx.setLineDash([5,6]);
+    ctx.beginPath();ctx.moveTo(th.ax,th.ay);ctx.lineTo(th.bx,th.by);ctx.stroke();ctx.setLineDash([]);
+    ctx.globalAlpha=1;
+  }else if(th.life>0){
+    const fade=clamp(th.life/.5,0,1);
+    ctx.globalAlpha=.4*fade;ctx.strokeStyle='#f2f6fa';ctx.lineWidth=6;
+    ctx.beginPath();ctx.moveTo(th.ax,th.ay);ctx.lineTo(th.bx,th.by);ctx.stroke();
+    ctx.globalAlpha=.9*fade;ctx.strokeStyle='#f2f6fa';ctx.lineWidth=2.2;
+    ctx.beginPath();ctx.moveTo(th.ax,th.ay);ctx.lineTo(th.bx,th.by);ctx.stroke();
+    ctx.globalAlpha=1;
+  }
+}
+}
 if(e.st==='tele'){
 const g=.35+.3*Math.sin(game.t*20);
 ctx.strokeStyle='rgba(157,107,181,'+g+')';ctx.lineWidth=2.5;
@@ -16004,6 +16312,14 @@ ctx.strokeStyle='rgba(232,69,90,.45)';ctx.lineWidth=3;
 ctx.setLineDash([12,9]);
 ctx.beginPath();ctx.moveTo(e.x,e.y);
 ctx.lineTo(e.x+Math.cos(e.ang)*900,e.y+Math.sin(e.ang)*900);
+ctx.stroke();ctx.setLineDash([]);
+}
+/* v1.6.3: INVESTIDA RICOCHETE — a rota da investida continua desenhada no chão durante o avanço */
+if(e.pat==='kz_ricochet'&&e.data&&e.data.phase==='dash'){
+ctx.strokeStyle='rgba(232,69,90,.5)';ctx.lineWidth=3.5;
+ctx.setLineDash([14,10]);
+ctx.beginPath();ctx.moveTo(e.x,e.y);
+ctx.lineTo(e.x+Math.cos(e.data.aimA)*900,e.y+Math.sin(e.data.aimA)*900);
 ctx.stroke();ctx.setLineDash([]);
 }
 /* assinatura visual do ataque (carrasco) */
@@ -16392,6 +16708,31 @@ ctx.restore();
 /* ============ render: efeitos ============ */
 function drawEBullets(){
 for(const b of ebullets){
+if(b.bat){
+/* v1.6.4: MORCEGO VAMPIRO — asas batendo; se acertar o Thor, CURA o dono */
+const fl=Math.sin(game.t*18+b.x*.13)*.9;
+const ba=Math.atan2(b.vy,b.vx);
+ctx.save();ctx.translate(b.x,b.y);ctx.rotate(ba+Math.PI/2);
+ctx.fillStyle=b.c;ctx.globalAlpha=.92;
+ctx.beginPath();ctx.ellipse(0,0,b.r*.62,b.r*.85,0,0,TAU);ctx.fill();
+ctx.beginPath();
+ctx.moveTo(0,-b.r*.2);
+ctx.quadraticCurveTo(-b.r*1.6,-b.r*(1.1+fl*.4),-b.r*2.1,b.r*.1+fl*2.2);
+ctx.quadraticCurveTo(-b.r*1.2,b.r*.45,0,b.r*.5);
+ctx.quadraticCurveTo(b.r*1.2,b.r*.45,b.r*2.1,b.r*.1+fl*2.2);
+ctx.quadraticCurveTo(b.r*1.6,-b.r*(1.1+fl*.4),0,-b.r*.2);
+ctx.fill();
+ctx.globalAlpha=1;ctx.fillStyle='#ff2450';
+ctx.beginPath();ctx.arc(-b.r*.26,-b.r*.35,1.6,0,TAU);ctx.fill();
+ctx.beginPath();ctx.arc(b.r*.26,-b.r*.35,1.6,0,TAU);ctx.fill();
+ctx.restore();
+continue;
+}
+/* v1.7.0: EDITOR DE MODS — bala redesenhada pelo estilo do mod */
+if(window.__MODS&&__MODS.on()&&__MODS.hasBullet(b.c)){__MODS.drawBullet(ctx,b);continue;}
+/* v1.7.3: EDITOR DE MODS — os 8 FORMATOS nas balas dos padrões do mod
+   (b.sh só existe em balas nascidas da forja — balas nativas nunca têm) */
+if(window.__MODS&&b.sh&&__MODS.drawShapeBullet){__MODS.drawShapeBullet(ctx,b);continue;}
 if(b.mine){
 const pulse=.6+.4*Math.sin(game.t*8);
 ctx.strokeStyle=b.c;ctx.globalAlpha=.35*pulse;ctx.lineWidth=2;
@@ -16744,6 +17085,14 @@ ctx.globalAlpha=1;
    e não um vazio sem textura. ==== */
 let paradiseOutsideCache=null,paradiseOutsideFloor=0;
 function drawParadiseOutside(){
+/* v1.6.2: FASE CINZA — lá fora é o MESMO cinza liso, um tom abaixo do chão:
+   sem céu, sem catedrais, sem árvores, sem grama, sem brilho animado.
+   Nenhuma estrutura no fundo, e nada para recalcular por frame. */
+if((game.limboPhase||1)>=4){
+  ctx.fillStyle='#3a3833';
+  ctx.fillRect(game.camX-4,game.camY-4,W+8,H+8);
+  return;
+}
 if(!paradiseOutsideCache||paradiseOutsideFloor!==game.floor){
   /* cacheia o exterior por andar — silhuetas distantes não mudam a cada frame */
   paradiseOutsideFloor=game.floor;
@@ -16956,23 +17305,27 @@ ctx.restore();
 }
 /* ==== drawParadiseWalls: percorre todas as bordas das salas e desenha
    as superfícies espelhadas apenas nos segmentos visíveis (externos). ==== */
-function drawParadiseWalls(){
-if(!isParadiseFloor()||ROOM.inverted)return;
+/* v1.6.2: as paredes espelhadas NÃO são mais varridas por frame. Os
+   segmentos externos nascem uma vez em buildParadiseSegs() (chamado na
+   construção da sala do paraíso) e a parte estática — gradientes leitoso,
+   reflexo difuso, rachaduras — fica pintada numa CAMADA EM CACHE; o frame
+   inteiro é 1 drawImage + os brilhos pulsantes (traços baratos, sem
+   gradiente, sem clip). Era exatamente aqui que o Limbo travava: cada
+   segmento criava 2 gradientes + save/clip/restore a cada quadro. */
+function buildParadiseSegs(){
+paradiseSegs=[];
 const rects=game.absRects;
-const allBounds=[];
-/* para cada retângulo, olha as 4 bordas e marca os segmentos externos */
 for(const rc of rects){
   const edges=[
-    {x1:rc.x,y1:rc.y,x2:rc.x+rc.w,y2:rc.y,horiz:true},       /* top */
-    {x1:rc.x+rc.w,y1:rc.y,x2:rc.x+rc.w,y2:rc.y+rc.h,horiz:false}, /* right */
-    {x1:rc.x+rc.w,y1:rc.y+rc.h,x2:rc.x,y2:rc.y+rc.h,horiz:true}, /* bottom */
-    {x1:rc.x,y1:rc.y+rc.h,x2:rc.x,y2:rc.y,horiz:false}        /* left */
+    {x1:rc.x,y1:rc.y,x2:rc.x+rc.w,y2:rc.y},
+    {x1:rc.x+rc.w,y1:rc.y,x2:rc.x+rc.w,y2:rc.y+rc.h},
+    {x1:rc.x+rc.w,y1:rc.y+rc.h,x2:rc.x,y2:rc.y+rc.h},
+    {x1:rc.x,y1:rc.y+rc.h,x2:rc.x,y2:rc.y}
   ];
   for(const E of edges){
     const L=Math.hypot(E.x2-E.x1,E.y2-E.y1);
     const n=Math.max(2,Math.round(L/7));
-    /* caminha pela borda coletando segmentos externos (não cobertos por outro retângulo) */
-    let pOn=false,px=0,py=0;
+    let run=null; /* início do trecho externo em andamento */
     for(let i=0;i<=n;i++){
       const t=i/n;
       const x=E.x1+(E.x2-E.x1)*t,y=E.y1+(E.y2-E.y1)*t;
@@ -16982,16 +17335,104 @@ for(const rc of rects){
         if(x>o.x+3&&x<o.x+o.w-3&&y>o.y+3&&y<o.y+o.h-3){covered=true;break;}
       }
       const on=!covered;
-      if(on&&pOn){
-        /* desenha um segmento espelhado fino ao redor da linha (px,py)-(x,y) */
-        drawMirrorSegment(px,py,x,y);
+      if(on&&!run)run={x1:x,y1:y};
+      else if(!on&&run){
+        if(Math.hypot(x-run.x1,y-run.y1)>3)paradiseSegs.push({x1:run.x1,y1:run.y1,x2:x,y2:y});
+        run=null;
       }
-      pOn=on;px=x;py=y;
     }
+    if(run)paradiseSegs.push({x1:run.x1,y1:run.y1,x2:E.x2,y2:E.y2});
   }
 }
+/* camada estática em cache — os gradientes/rachaduras desenhados 1× por sala */
+const key=rects.map(r=>r.x+','+r.y+','+r.w+','+r.h).join(';')+'|'+Math.round(paradiseDistort()*20);
+if(paradiseWallsKey!==key){
+  paradiseWallsKey=key;
+  let ox=Infinity,oy=Infinity,mx=-Infinity,my=-Infinity;
+  for(const s of paradiseSegs){
+    ox=Math.min(ox,s.x1,s.x2);oy=Math.min(oy,s.y1,s.y2);
+    mx=Math.max(mx,s.x1,s.x2);my=Math.max(my,s.y1,s.y2);
+  }
+  if(paradiseSegs.length&&mx>ox){
+    ox-=10;oy-=10;mx+=10;my+=10;
+    const c=document.createElement('canvas');
+    c.width=Math.max(2,Math.ceil(mx-ox));c.height=Math.max(2,Math.ceil(my-oy));
+    const f=c.getContext('2d');
+    const distort=paradiseDistort();
+    for(const s of paradiseSegs)paintMirrorStrip(f,s,ox,oy,distort);
+    paradiseWallsCache={c,ox,oy};
+  }else paradiseWallsCache=null;
 }
-/* desenha uma faixa espelhada fina ao redor de um segmento de linha */
+}
+function drawParadiseWalls(){
+if(!isParadiseFloor()||ROOM.inverted)return;
+/* v1.6.2: FASE CINZA — o último véu não tem paredes espelhadas: o fundo é liso */
+if((game.limboPhase||1)>=4)return;
+if(!paradiseWallsCache)return;
+const pw=paradiseWallsCache;
+ctx.drawImage(pw.c,pw.ox,pw.oy);
+/* brilho pulsante — o único traço vivo que sobrou, barato */
+for(let i=0;i<paradiseSegs.length;i++){
+  const s=paradiseSegs[i];
+  const shine=.5+.5*Math.sin(game.t*.8+(s.x1+s.y1)*.01);
+  ctx.strokeStyle='rgba(255,250,220,'+(0.4*shine)+')';
+  ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(s.x1,s.y1);ctx.lineTo(s.x2,s.y2);ctx.stroke();
+}
+}
+/* pinta UMA faixa espelhada na camada em cache (f = contexto do cache,
+   ox/oy = origem do cache no mundo) — antes isto rodava por frame por
+   segmento; agora é 1× por sala. */
+function paintMirrorStrip(f,s,ox,oy,distort){
+const dx=s.x2-s.x1,dy=s.y2-s.y1;
+const L=Math.hypot(dx,dy);
+if(L<1)return;
+const nx=-dy/L,ny=dx/L;
+const thickness=6;
+const ax=s.x1+nx*thickness,ay=s.y1+ny*thickness;
+const bx=s.x2+nx*thickness,by=s.y2+ny*thickness;
+const cx=s.x2-nx*thickness,cy=s.y2-ny*thickness;
+const dx2=s.x1-nx*thickness,dy2=s.y1-ny*thickness;
+const kxs=[ax,bx,cx,dx2],kys=[ay,by,cy,dy2];
+const minX=Math.min.apply(null,kxs)-ox,minY=Math.min.apply(null,kys)-oy;
+const w=Math.max.apply(null,kxs)-Math.min.apply(null,kxs)+1;
+const h=Math.max.apply(null,kys)-Math.min.apply(null,kys)+1;
+f.save();
+f.beginPath();
+f.moveTo(ax-ox,ay-oy);f.lineTo(bx-ox,by-oy);f.lineTo(cx-ox,cy-oy);f.lineTo(dx2-ox,dy2-oy);f.closePath();
+f.clip();
+const mx=(s.x1+s.x2)/2-ox,my=(s.y1+s.y2)/2-oy;
+/* gradiente leitoso na direção da normal */
+const g=f.createLinearGradient(mx-nx*thickness,my-ny*thickness,mx+nx*thickness,my+ny*thickness);
+g.addColorStop(0,'rgba(255,250,235,0.95)');
+g.addColorStop(.5,'rgba(232,228,212,0.9)');
+g.addColorStop(1,'rgba(212,206,188,0.85)');
+f.fillStyle=g;
+f.fillRect(minX,minY,w,h);
+/* reflexo difuso */
+const refl=f.createLinearGradient(mx-nx*thickness,my-ny*thickness,mx+nx*thickness,my+ny*thickness);
+refl.addColorStop(0,'rgba(168,200,224,0.3)');
+refl.addColorStop(.5,'rgba(208,228,212,0.25)');
+refl.addColorStop(1,'rgba(150,178,118,0.22)');
+f.fillStyle=refl;
+f.fillRect(minX,minY,w,h);
+/* distorção: rachaduras estáticas (antes nasciam aleatórias TODO frame) */
+if(distort>.4){
+  f.strokeStyle='rgba(20,16,28,'+(distort*0.5)+')';
+  f.lineWidth=0.7;
+  const nCr=2+Math.round(L/70);
+  for(let i=0;i<nCr;i++){
+    const t=Math.random();
+    const sx=s.x1+(s.x2-s.x1)*t-ox,sy=s.y1+(s.y2-s.y1)*t-oy;
+    f.beginPath();f.moveTo(sx,sy);
+    f.lineTo(sx+nx*rnd(-4,4),sy+ny*rnd(-4,4));
+    f.stroke();
+  }
+}
+f.restore();
+}
+/* (v1.6.1 e antes) desenha uma faixa espelhada fina ao redor de um segmento —
+   mantida para referência; o desenho por frame agora usa a camada em cache */
 function drawMirrorSegment(x1,y1,x2,y2){
 const dx=x2-x1,dy=y2-y1;
 const L=Math.hypot(dx,dy);
@@ -18086,7 +18527,18 @@ if(s.strong){ctx.strokeStyle='rgba(201,160,255,.55)';ctx.lineWidth=1;ctx.beginPa
 ctx.restore();
 /* preço (e nome quando é a mercadoria mais próxima) */
 ctx.save();ctx.translate(s.x,s.y);
-if(near&&!s.bought)txt(s.name,0,-20,MONO,8,'#ffd9a0','center',1);
+if(near&&!s.bought){
+/* v1.6.3: DESTAQUE TOTAL — a bênção selecionada ganha uma placa clara com o
+   NOME em AZUL-ESCURO, bem legível de ler (antes era um texto pequeno cor de
+   pergaminho que sumia no chão escuro) */
+ctx.font='700 11px '+MONO;
+const nw=ctx.measureText(s.name).width,bw=nw+18;
+ctx.fillStyle='rgba(233,236,242,.95)';
+ctx.strokeStyle='#2c5fb8';ctx.lineWidth=1.5;
+ctx.fillRect(-bw/2,-32,bw,18);
+ctx.strokeRect(-bw/2,-32,bw,18);
+ctx.fillStyle='#0c2d6b';ctx.textAlign='center';ctx.fillText(s.name,0,-19);
+}
 const afford=game.souls>=s.price;
 ctx.globalAlpha=s.bought?.55:1;
 txt(s.bought?'VENDIDO':(s.price+' ALMAS'),0,20,MONO,8,s.bought?'#6e6357':afford?(s.strong?'#c9a0ff':'#ffd9a0'):'#d9465a','center',1);
@@ -18510,7 +18962,15 @@ txt(hdata.name,x+segW/2,y-11,MONO,10,hdata.alive?hdata.c:'#5c5450','center',3);
 if(boss.phase2){
 txt('FASE II — FÚRIA',W/2,y+24,MONO,10,Math.floor(game.t*8)%2?'#e8455a':'#e6dac4','center',5);
 }
-/* v1.6.0: a barra do FRENESI saiu junto — o anel que acelera é o próprio aviso */
+if(boss.frenzyActive){
+const left=1-clamp(boss.frenzyT/frenzyDur(),0,1);
+const fy=y+(boss.phase2?40:24);
+txt('FRENESI',W/2,fy-8,MONO,10,Math.floor(game.t*8)%2?'#e8455a':'#e6dac4','center',5);
+ctx.strokeStyle='rgba(232,69,90,0.6)';ctx.lineWidth=1;
+ctx.strokeRect(W/2-160,fy,320,6);
+ctx.fillStyle='#e8455a';
+ctx.fillRect(W/2-159,fy+1,318*left,4);
+}
 }
 function drawMiniBossBar(){
 const mb=miniBossAny();
@@ -18617,7 +19077,7 @@ if(player.hp>0&&player.hp/player.maxHp<.3&&game.state==='play'){
 }
 if(game.state==='ending')return;
 const bx=80,bw=W-160,by=14;
-if(boss.active&&game.state==='play'&&boss.barT>0&&game.region!=='limbo'){ /* v1.5.6: o pó não mostra barra · v1.6.0: e o Limbo nunca mais */
+if(boss.active&&game.state==='play'&&boss.barT>0){ /* v1.5.6: o pó não mostra barra */
 txt('CERBERUS — O GUARDIÃO DA PASSAGEM'+(boss.phase2?' · FASE II':''),W/2,by+2,MONO,11,'#a52a3a','center',3); /* v1.5.7: o nome da apresentação */
 drawBossBar();
 }else if(game.mapRooms.length){
@@ -18832,7 +19292,6 @@ drawDarkSoul();
 drawBoss();
 for(const e of enemies)drawEnemy(e);
 drawPlayer();
-drawPlayerHitbox(); /* v1.6.2: o ponto vermelho É a hitbox — POR CIMA do corpo */
 drawPistols();/* v1.2.0 */
 if(window.__EXPANSION&&window.__EXPANSION.drawColher)window.__EXPANSION.drawColher();/* v1.3.4: a colher gigante na pata (parada/carga/colherada) */
 if(window.__RM&&window.__RM.drawOver)window.__RM.drawOver();/* v1.4.0: órbitas, pato, cópia, canhão, CÉRBERO — A SENTENÇA FINAL */
@@ -18950,6 +19409,7 @@ ctx.save();
 ctx.translate(-game.camX,-game.camY);
 drawWorld(ctx);
 ctx.restore();
+if(window.__GRI)window.__GRI.drawWorld(ctx,-game.camX,-game.camY); /* v1.9.0: feixes, marcas, lente, luz e Magika por cima do mundo */
 drawE404Glitch(); /* glitch de tela — espaço de tela, fora da câmera */
 drawReiUltimate();
 if(game.state==='dead')drawDeadFace();
@@ -19245,11 +19705,6 @@ ctx.stroke();
 ctx.fillStyle='#e8455a';
 ctx.beginPath();ctx.arc(mouse.x,mouse.y,1.6,0,TAU);ctx.fill();
 }
-/* v1.6.2: O LIMBO...? NÃO É MAIS UM FILTRO — o filtro 'saturation' saiu
-   (pedido: "o limbo cinza não é um filtro"). O cinza agora nasce NO TERRENO:
-   o chão é desenhado morto no buildRoomFloor (grama cinza, sem flores, cinza
-   acumulada) e as estruturas desenham sem cor (drawDecor). Balas, inimigos
-   e o Thor seguem com as cores deles. */
 if(window.__EXPANSION&&(game.state==='play'||game.state==='bossintro'))window.__EXPANSION.draw(); /* v1.3.0 */
 if(window.__EXPANSION&&window.__EXPANSION.drawCerbCard&&(game.state==='play'||game.state==='bossintro'))window.__EXPANSION.drawCerbCard(); /* v1.5.7: o nome some LENTO quando o chefe começa a se mover */
 const fadeA=clamp(Math.max(game.roomFade,game.fallK>=0?game.fallK:0),0,1);
@@ -19298,13 +19753,16 @@ p.innerHTML='<h4>PENUMBRA — MONTADOR</h4>'+
 buildDevPanel();
 }
 }
-/* ==== HUD v0.9.0 — atualiza o círculo atual e o cooldown do Latido ==== */
+/* ==== HUD v0.9.0 — atualiza o círculo atual e o cooldown do Latido ====
+   v1.9.1 DESEMPENHO: só escreve no DOM quando o valor MUDA (antes eram
+   escritas de display/textContent todo quadro, mesmo sem mudar nada) */
+let _hudVBtn=null,_hudCircle=null,_hudHudOn=null,_hudBiOn=null,_hudBiLbl=null,_hudBiNm=null,_hudBiTag=null,_hudBiKey=null,_hudBiPct=-1;
 function updateVersionHUD(){
 /* v0.9.6: o botão de versão só aparece no menu principal */
 const vbtn=ov('versionBtn');
 if(vbtn){
-  if(game.state==='menu')vbtn.style.display='';
-  else vbtn.style.display='none';
+  const want=game.state==='menu'?'':'none';
+  if(_hudVBtn!==want){_hudVBtn=want;vbtn.style.display=want;}
 }
 /* indicador do círculo atual */
 const hud=ov('circleHud');
@@ -19312,14 +19770,12 @@ const hudName=ov('circleHudName');
 if(hud&&hudName){
   const inGame=game.state==='play'||game.state==='bossintro'||game.state==='corridor'||game.state==='carontefight'||game.state==='caronte'||game.state==='boatride';
   if(inGame){
-    hud.style.display='';
+    if(_hudHudOn!==1){_hudHudOn=1;hud.style.display='';}
     let circle='PENUMBRA DAS ALMAS';
     if(game.floor>=2)circle='LIMBO';
     if(game.state==='carontefight'||game.state==='caronte'||game.state==='boatride')circle='RIO DE CARONTE';
-    hudName.textContent=circle;
-  }else{
-    hud.style.display='none';
-  }
+    if(_hudCircle!==circle){_hudCircle=circle;hudName.textContent=circle;}
+  }else if(_hudHudOn!==0){_hudHudOn=0;hud.style.display='none';}
 }
 /* indicador do Item Ativo — v0.9.16: HUD própria do ativo (roxo/dourado,
    nome completo, tag ATIVO) — distinta de bênçãos passivas e do latido da escola */
@@ -19327,7 +19783,7 @@ const bi=ov('barkIndicator');
 if(bi){
   const inSchool=game.state==='school';
   if((game.activeItem&&(game.state==='play'||game.state==='carontefight'||game.state==='bossintro'))||inSchool){
-    bi.style.display='';
+    if(_hudBiOn!==1){_hudBiOn=1;bi.style.display='';}
     const item=ACTIVE_ITEMS[game.activeItem];
     const cd=game.activeCd||0;
     const max=item?item.cd||8:8;
@@ -19337,22 +19793,21 @@ if(bi){
     bi.classList.toggle('schoolBark',inSchool);
     const cdEl=bi.querySelector('.barkCd');
     if(cdEl){
-      const pct=clamp(1-cd/max,0,1)*100;
-      cdEl.style.setProperty('--cd',pct+'%');
+      const pct=Math.round(clamp(1-cd/max,0,1)*100);
+      if(_hudBiPct!==pct){_hudBiPct=pct;cdEl.style.setProperty('--cd',pct+'%');}
     }
     const lbl=bi.querySelector('.barkLabel');
     /* v1.4.4: o HUD mostra só "SPC" — sem o nome do item (a ficha completa
        ficou no livro, na seção ITENS ATIVOS) */
-    if(lbl)lbl.textContent=inSchool?'LATIDO':(ready?'SPC':(Math.ceil(cd)+'s'));
+    const wantLbl=inSchool?'LATIDO':(ready?'SPC':(Math.ceil(cd)+'s'));
+    if(lbl&&_hudBiLbl!==wantLbl){_hudBiLbl=wantLbl;lbl.textContent=wantLbl;}
     const nm=bi.querySelector('.barkName');
-    if(nm)nm.textContent=inSchool?'\u00a0':'';
+    if(nm){const wantNm=inSchool?'\u00a0':'';if(_hudBiNm!==wantNm){_hudBiNm=wantNm;nm.textContent=wantNm;}}
     const tagEl=bi.querySelector('.barkTag');
-    if(tagEl)tagEl.textContent=inSchool?'ESC':'ATIVO';
+    if(tagEl){const wantTag=inSchool?'ESC':'ATIVO';if(_hudBiTag!==wantTag){_hudBiTag=wantTag;tagEl.textContent=wantTag;}}
     const keyEl=bi.querySelector('.barkKey');
-    if(keyEl)keyEl.textContent=keyLabel(keybinds.active[0]);
-  }else{
-    bi.style.display='none';
-  }
+    if(keyEl){const wantKey=keyLabel(keybinds.active[0]);if(_hudBiKey!==wantKey){_hudBiKey=wantKey;keyEl.textContent=wantKey;}}
+  }else if(_hudBiOn!==0){_hudBiOn=0;bi.style.display='none';}
 }
 }
 /* ============ laço principal ============ */
@@ -19364,7 +19819,16 @@ last=now;
 musicTick();
 updateDevPanel();
 updateVersionHUD();
-if(game.paused){decayScreenFx(dt);render();return;}
+if(game.paused){
+/* v1.9.1 DESEMPENHO: com o mundo CONGELADO, re-renderizar a cena inteira a
+   60fps é queima seca — pinta um quadro ao entrar na pausa (e enquanto houver
+   efeito de tela vivo: tremer, flash, dano); estático = não renderiza. */
+decayScreenFx(dt);
+const _live=game.shake>0||game.flash>0||game.hurtV>0||heartsPopT>0;
+if(_live||!game._pauseClean){render();game._pauseClean=!_live;}
+return;
+}
+game._pauseClean=false;
 if(game.hitstop>0){game.hitstop-=dt;dt=0;}
 /* v1.5.0: TRANSIÇÃO DESLIZANTE — o mundo congela 0.32s enquanto as salas deslizam */
 if(game.slide){game.t+=dt;updateSlide(dt);updateFX(dt);render();return;}
@@ -19383,6 +19847,7 @@ metaTimer+=dt;
 if(metaTimer>2){metaTimer=0;metaTick();}
 processBestiaryQueue();/* v0.9.13: retratos do bestiário (invisível — antes do render) */
 if(game.state==='menu')updateAttract(dt);
+else if(game.state==='saves'){/* v1.9.1: o REGISTRO DAS ALMAS cobre o livro — o mundo atrás não é simulado nem desenhado */}
 else if(game.state==='play')updatePlay(dt);
 else if(game.state==='corridor')updateCorridor(dt);
 /* v1.3.0: estados da expansão */
@@ -19422,7 +19887,22 @@ updateBossIntro(dt);updatePickups(dt);if(!_wa)updateEBullets(dt);if(window.__EXP
 else if(game.state==='ending')updateEnding(dt);
 else if(game.state==='dead')updateDead(dt);
 updateCamera(dt);
+/* v1.9.1 DESEMPENHO: no menu (e no registro das almas dentro do livro), o
+   livro cobre a tela inteira — renderizar o mundo atrás é CPU/GPU queimada
+   a 60fps. O canvas mantém o último quadro (invisível); ao sair do menu o
+   desenho recomeça no mesmo tick. A regra respeita as telas
+   SEMI-TRANSPARENTES (grimório/novidades/saves têm fundo com bleed): com
+   qualquer uma delas aberta, o render continua normal. */
+if((game.state==='menu'||game.state==='saves')&&!_menuHidden()&&!_entryShown()&&!_menuTranslucent())return;
 render();
+}
+function _menuHidden(){const m=document.getElementById('menu');return !m||m.classList.contains('hidden');}
+function _entryShown(){const el=document.getElementById('entry');return !!el&&!el.classList.contains('hidden');} /* v1.9.1: a tela de entrada cobre tudo — nada de renderizar atrás */
+function _menuTranslucent(){
+/* telas por cima do menu cujo fundo DEIXA o mundo aparecer */
+const ids=['book','versionInfo','saves'];
+for(const i of ids){const el=document.getElementById(i);if(el&&!el.classList.contains('hidden'))return true;}
+return false;
 }
 /* ============ menu / vitrine ============ */
 function initAttract(){
@@ -19440,7 +19920,8 @@ h.hy=boss.y+Math.sin(boss.angle+h.baseAng)*180;
 game.mapRooms=[];game.roomIdx=-1;game.extraIdx=-1;game.doors=[];
 game.floor=1;game.usedMinis=[];game.portal=null;
 game.region='penumbra';game.postCerberusFloors=0;
-game.limboPending=false;game.limboLoadT=0;game.gatePending=false;game.limboTestPending=false; /* v1.5.3 · v1.6.5 */
+game.limboPending=false;game.limboLoadT=0;game.gatePending=false; /* v1.5.3 */
+game.limboTestPending=false; /* v1.6.0: TESTE — última fase do Limbo */
 game._arenaLock=false; /* v1.5.4: a trava de escada da arena do Cérbero nunca atravessa runs */
 game.caronteBoss=null;game.carontePhase=0;game.caronteReturn=false;game.fromCaronte=false;
 game.futureBossMode=false;
@@ -19485,6 +19966,7 @@ function openOptions(from){
 audio();
 optionsFrom=from;
 if(from==='pause')hideOv('pause');
+else if(window.__BOOK&&__BOOK.asPage)__BOOK.asPage('options'); /* v1.9.1: o livro fica na mesa — a página de ajustes pousa sobre ele */
 else hideOv('menu');
 showOv('options');
 syncOptUI();refreshKbBtns();
@@ -19494,6 +19976,7 @@ function closeOptions(){
 hideOv('options');
 rebindAction=null;
 if(optionsFrom==='pause')showOv('pause');
+else if(window.__BOOK&&__BOOK.unPage)__BOOK.unPage('options'); /* v1.9.1: a folha volta e o livro retorna à posição anterior */
 else showOv('menu');
 blurActive();
 }
@@ -19564,21 +20047,21 @@ function startGateDirect(){
   const ws=ov('weaponsSub');if(ws)ws.textContent='escolha uma arma — você vai direto para o caminho do portão';
   blip('sine',140,90,.4,.08);
 }
-/* ==== v1.6.5: TESTE — O LIMBO CINZA direto do menu. Escolhe a arma e spawna
-   JÁ na ÚLTIMA FASE do limbo (o limbo...? — fase 4: chão morto desenhado
-   cinza, inimigos raros e fracos, a aura dourada vazando da porta do chefe
-   e a PLACA do primeiro pecado no quarto extra — lê ([Z]), sai ([Z]) e o
-   buraco da luxuria abre; a luta da ganancia segue DORMANTE). ==== */
-function startLimboTest(){
+/* ==== v1.6.0: TESTE TEMPORÁRIO — LIMBO, ÚLTIMA FASE, direto do menu.
+   Escolhe a arma e spawna JÁ na FASE 4 do Limbo (O LIMBO INFERNAL —
+   FASE 2, andar 9) para conferir o fim da descida cinza sem jogar do
+   começo: varreu o mapa → o Juiz desperta. Temporário — sai quando
+   aprovado, como o botão do portão. ==== */
+function startLimboTestDirect(){
   audio();
   game.limboTestPending=true;
   ['menu','circles','dead','win','pause','limboLoading','descer'].forEach(hideOv);
   openWeaponSelect();
-  const wt=ov('weaponsTitle');if(wt)wt.textContent='O LIMBO CINZA';
+  const wt=ov('weaponsTitle');if(wt)wt.textContent='O LIMBO — FASE FINAL';
   const we=ov('weaponsEyebrow')||ov('weapons').querySelector('.lu-eyebrow');
   if(we)we.textContent='TESTE — ACESSO DIRETO';
-  const ws=ov('weaponsSub');if(ws)ws.textContent='escolha uma arma — você vai direto para a última fase do limbo cinza';
-  blip('sine',180,110,.4,.08);
+  const ws=ov('weaponsSub');if(ws)ws.textContent='escolha uma arma — você vai direto para a última fase do Limbo (4/4)';
+  blip('sine',140,90,.4,.08);
 }
 /* loop de update da tela de loading do Limbo */
 function updateLimboLoad(dt){
@@ -19735,7 +20218,16 @@ box.innerHTML=
 '<div style="margin-left:14px;margin-bottom:10px">A EXPANSÃO chegou — aditiva, sem apagar nada. <b style="color:#ffd9a0">PROGRESSÃO NOVA</b>: Penumbra das Almas (fases 1-2) → <b>PENUMBRA INFERNAL</b> (fases 1-2, chão rachado e brasas) → <b style="color:#cfe9ff">CAMINHO DO PORTÃO</b> (sem inimigos) → <b style="color:#d9465a">CÉRBERO remasterizado</b> (cutscene de entrada com o portão abrindo devagar, as três cabeças observando e se virando juntas; 3 FASES: A FOME DAS TRÊS BOCAS, O ÚLTIMO PORTÃO) → <b style="color:#ff8f3d">GARGANTA VULCÂNICA</b> (lava, erupções telegrafadas e o <b>FERREIRO DAS ALMAS</b>) → <b style="color:#7fb8ff">CORREDOR AZULADO</b> (o vermelho morre, a névoa fria toma conta) → travessia de <b>CARONTE</b> → <b>O LIMBO em 4 FASES</b> → <b style="color:#9d6bb5">O JUIZ SEM ROSTO</b> no tribunal final. <b style="color:#ffd9a0">ELEMENTOS E SINERGIAS</b>: 8 categorias (Luz, Escuridão, Fogo, Água, Gelo, Vento, Raio, Terra) com chips nas cartas, pares novos (VAPOR ESCALDANTE, PRISÃO DO AQUERONTE, CONDUTOR DOS CONDENADOS, INCÊNDIO DO INFERNO, SEPULTURA GLACIAL) e sinergias de itens (CARNICEIRO, MADRUGADA, CADEIA ARDENTE, VENDAVAL GELADO, O COBRADOR, DUPLA TESTEMUNHA, TIRO PARLANTINO, MARÉ DE BRASA) — tudo registrado no <b>grimório, aba SINERGIAS</b> (páginas rasuradas até descobrir). <b style="color:#ffd9a0">16 BÊNÇÃOS + 11 PACTOS NOVOS</b> (Sol Estilhaçado, Halo Partido, Correntes do Pecado, Reflexo que Não É Seu… Pacto do Açougueiro, da Hora Roubada, do Barqueiro, do Desenvolvedor, o secreto PACTO 404…). <b style="color:#ffd9a0">6 ARMAS NOVAS</b> na escolha inicial: <b>A SENTENÇA</b>, <b>PISTOLAS DO ÚLTIMO PECADO</b>, <b>O CREDOR</b>, <b>COLHER DE MADEIRA DIVINA</b>, <b>PEIXE DE GUERRA</b> e <b>TECLADO DO PECADOR</b> — cada uma com evolução própria. <b style="color:#ffd9a0">CHEFES E ENCONTROS</b>: Juiz Sem Rosto (final), Ferreiro das Almas (Garganta), Anjo Acorrentado (correntes destrutíveis), a secreta Serpente que Engole Estrelas (salas secretas do Limbo), o Thor que Não Desceu (aparece no portão para builds de 6+ bênçãos) e o <b>CERVO DESFIGURADO</b> (aparições silenciosas na Penumbra). <b style="color:#ffd9a0">DIFICULDADES</b>: <b>PUNIÇÃO</b>, <b>KAIZO</b> (título), <b>ABISMO</b> (caçada em grupo) e <b>PENITÊNCIA</b> (desbloqueia ao concluir o Abismo) + 7 modificadores (Inferno Instável, Sem Misericórdia, Dívida de Sangue, Silêncio Absoluto, O Inferno Observa, Portas Fechadas, Sem Segunda Chance). <b style="color:#ffd9a0">CORREÇÕES</b>: <b style="color:#cfe9ff">cutscene curta (≤1s)</b> ao passar de porta/escada — para Thor E para a coisa de cervo (quando ele atravessa perto, você vê a fresta e a silhueta); <b style="color:#cfe9ff">TENTAR NOVAMENTE depois de morrer na escola revive na escola</b>; a <b style="color:#cfe9ff">mensagem de morte muda a cada morte</b> (e depois de muitas, a besta desiste: só "..." e o jogo começa normal); e o <b style="color:#cfe9ff">LATIDO DA ESCOLA FOI CONSERTADO</b> — o ESPAÇO estava mudo antes da revelação e depois que ela ia embora; agora o latido SEMPRE soa (o atrair-ela continua funcionando como sempre). Música nova por zona (vulcão, corredor azul, portão, juiz) e 9 conquistas novas.</div>'+
 '<div style="color:#e6dac4;font-size:13px;margin:10px 0">29. v1.3.1 — TRÊS GARGANTAS</div>'+
 '<div style="margin-left:14px;margin-bottom:10px">Correções da expansão + o <b style="color:#d9465a">CÉRBERO remasterizado</b>. <b style="color:#ffd9a0">ITENS ATIVOS</b>: pegar um novo com outro equipado ARREMESSA o antigo para fora do corpo e ele fica <b>2 segundos impossível de repégar</b> — o bug de "pegou muitas vezes" morreu (e pegar sempre foi só passar por cima). <b style="color:#ffd9a0">AS ARMAS NOVAS NÃO ATACAM MAIS SOZINHAS</b>: agora obedecem ao comando, igual às antigas — <b>clique/toque</b> dispara na hora e <b>setas seguradas</b> atacam contínuo. <b style="color:#9d6bb5">O CREDOR refeito</b>: a corrente PRENDE o devedor, ARRASTA até você e, <b>na hitbox, o golpe vem imediato e ARREMESSA o corpo</b> — ele voa, se choca com os outros demônios e <b>todos no choque recebem dano</b>. A COLHER DE MADEIRA DIVINA assume o nome verdadeiro: <b style="color:#ffe9b8">COLHER COMICAMENTE GRANDE</b>. <b style="color:#ff8f3d">PENUMBRA INFERNAL consertada</b>: o portal fantasma do andar 4 não existe mais — varreu as duas fases, vem a <b>FASE ÚNICA</b>: uma caminhada curta até o <b>PORTÃO ENORME</b>, que abre devagar direto para a arena nova do Cérbero (o velho sono congelado de 14s <b>saiu do caminho</b>). <b style="color:#d9465a">ENTRADA REMASTERIZADA</b>: o portão abre devagar, Cérbero imóvel, as três cabeças observam direções diferentes, a central te acompanha — e <b>quando você se aproxima</b> as três se viram juntas; a música sobe aos poucos e o nome chega na hora certa, sem interromper a ação. <b style="color:#d9465a">A LUTA</b>: as 3 fases agora <b>LIGAM de verdade</b> (o gancho antigo só vivia na intro e nunca rodava) — <b>FASE I — O CÃO QUE CAÇA</b> (bote telegrafado: solo pulsando e seta no chão), <b>FASE II — A FOME DAS TRÊS BOCAS</b> (leques conjuntos e pescoços que avançam), <b>FASE III — O ÚLTIMO PORTÃO</b> (arena escura, uivo, anéis e a janela <b>VULNERÁVEL</b>). O diálogo antigo pós-luta e a <b>ALMA NEGRA</b> continuam lá, intocados.</div>'+
-'<div style="color:#e6dac4;font-size:13px;margin:10px 0">57. v1.6.5 — O ATALHO AO CINZA</div>'+'<div style="margin-left:14px;margin-bottom:10px">Um botão novo no menu, pedido para conferir o fim de perto: <b style="color:#a8a8b4">O LIMBO CINZA · TESTE</b> — escolha a arma e caia DIRETO na <b>ÚLTIMA FASE do limbo...?</b> (a fase 4, a mais funda do cinza), sem descer andar nenhum, sem Cérbero, sem Caronte, sem corredor. Varra o mapa esvaziado (inimigos raros e fracos, como sempre), veja a <b style="color:#ffd9a0">aura dourada vazando da porta do chefe</b> quando o quarto extra se abrir, entre e confira a <b>sala do primeiro pecado</b>: a placa ([Z] para ler, [Z] para sair), o <b style="color:#ff6ad5">buraco da luxuria</b> abrindo direto (a luta da ganancia segue DORMANTE esperando os seus sprites e diálogos) e o fim dos círculos (modo infinito ou menu). NADA mais mudou: o caminho normal do jogo segue EXATAMENTE igual — o atalho é só um palco de teste, como o do portão.</div>'+'<div style="color:#e6dac4;font-size:13px;margin:10px 0">56. v1.6.4 — O PONTO NO SHIFT</div>'+'<div style="margin-left:14px;margin-bottom:10px">A hitbox encolheu e o ponto virou mira. <b style="color:#fffdf4">A HITBOX DIMINUIU</b>: de volta ao <b>tamanho de um tiro</b> (8→5) — o corpo visual do Thor continua valendo para portas, itens e empurrões, mas o que RECEBE dano voltou a ser o alvo minúsculo. E <b style="color:#ff2e55">O PONTO VERMELHO SÓ APARECE SEGURANDO SHIFT</b>: sem a tecla, NADA de disco sobre o Thor — segurando SHIFT (o foco, com o passo lento), o ponto carmesim desenha POR CIMA do corpo com o TAMANHO EXATO da hitbox e os anéis pulsantes ao redor. O resto segue intocado: só a placa no limbo...?, limbo cinza no chão, NEO KAIZO, bosses kaizo frenéticos e a mensagem da spell card única por card.</div>'+'<div style="color:#e6dac4;font-size:13px;margin:10px 0">55. v1.6.3 — SÓ A PLACA</div>'+'<div style="margin-left:14px;margin-bottom:10px">A sala do primeiro pecado ficou como você pediu: <b style="color:#ffd9a0">a GANANCIA NÃO MATERIALIZA (ainda)</b>. Lida a placa e saído da leitura ([Z], [Z]), o <b style="color:#ff6ad5">buraco da luxuria</b> se abre DIRETO — sem luta, sem banner, sem roubo; a sala tem <b>SÓ a placa</b>, a aura dourada vazando e o fim dos círculos (modo infinito ou menu). A luta inteira da v1.6.2 — os anéis de moedas, as mãos do tesouro, o dízimo, o puxão da avareza e o ROUBO no final — continua no código, <b>DORMANTE</b> atrás da flag GANANCIA_LUTA: <b style="color:#9c8f7c">quando os sprites e os diálogos do primeiro pecado ficarem prontos, ela volta inteira</b>. NADA mais mudou: o ponto vermelho segue sendo a hitbox, o limbo cinza segue desenhado no chão, o boss repetido segue NEO KAIZO e a mensagem da spell card segue única por card.</div>'+'<div style="color:#e6dac4;font-size:13px;margin:10px 0">54. v1.6.2 — O PECADO DA GANANCIA</div>'+'<div style="margin-left:14px;margin-bottom:10px">A placa deixou de ser piada. <b style="color:#ffd9a0">A GANANCIA MATERIALIZA</b>: lida a placa do primeiro pecado, o que estava escrito vira realidade — <b>o boss do "limbo?" 2 é ELE</b>, uma moeda viva de olho vermelho e sorriso faminto, com luta própria e frenética: <b>anéis de moedas com brechas</b>, as <b>mãos do tesouro</b> detonando onde você pisa, a <b>cortina do dízimo</b> varrendo a sala e o <b>puxão da AVAREZA</b> — um fio de ouro que te ARRASTA até ele. E como foi prometido na placa: <b style="color:#ff2e55">NO FINAL ELE ROUBA TUDO SEU</b> — as almas, o que caiu no chão e metade da vida — e foge rindo; aí sim o <b style="color:#ff6ad5">buraco da luxuria</b> se abre. <b style="color:#fffdf4">O PONTO VERMELHO É A HITBOX</b>: a hitbox de dano SUBIU (5→8) e o disco vermelho agora é desenhado <b>POR CIMA do Thor</b> — antes ele nascia embaixo do sprite e ninguém via — sempre visível, com o tamanho EXATO da hitbox (segurando SHIFT ele pulsa com anéis). <b style="color:#9c8f7c">O LIMBO CINZA NÃO É MAIS UM FILTRO</b>: o cinza nasce NO CHÃO — grama desenhada morta, sem flores, cinza acumulada, tufos secos — e as estruturas religiosas desenham SEM COR; balas, inimigos e o Thor seguem com as cores deles. <b style="color:#eef2f4">NEO KAIZO</b>: o boss que REPETE no modo kaizo se apresenta como <b>NEO KAIZO — [nome]</b>. <b style="color:#cfe9ff">TODOS OS BOSSES KAIZO COMO O BRUXO</b>: carrasco, viúva e golem ganharam o motor completo — <b>FASE II aos 50% de vida</b>, os padrões exclusivos que existiam no código mas NUNCA ATIRAVAM (guilhotinas/corrente/execução, teias/ninhada/laço, fissuras/tempestade/núcleo) agora entram no sorteio com telegrafo, um <b>QUARTO padrão novo para cada</b> (O PACTO do bruxo, O FERRO do carrasco, O CASULO da viúva, A PIRA do golem), <b>combos encadeados</b> e <b>cadência frenética</b> — o modo kaizo é um bullet hell de verdade. E no remake: <b style="color:#ff8fa0">a MENSAGEM da spell card aparece UMA vez por card</b> — o Cérberus PODE reutilizar a card quantas vezes quiser, só o anúncio não se repete.</div>'+'<div style="color:#e6dac4;font-size:13px;margin:10px 0">53. v1.6.1 — O JULGAMENTO VERDADEIRO</div>'+'<div style="margin-left:14px;margin-bottom:10px">Nove ajustes, um julgamento. <b style="color:#cfe9ff">A PORTA DE TRÁS SAIU DE VEZ</b>: nada de portão desenhado atrás do Thor dentro da arena — ele entra e a arena é só arena (o portão de VERDADE, o do caminho com [Z], segue intacto). <b style="color:#ff2e55">KAIZO DE VERDADE — A 9ª SPELL CARD</b>: no modo mais difícil a sentença ganha a nona barra, <b>Cão Branco 「Julgamento Verdadeiro」</b> — o Cérbero invoca <b>CINCO ESFERAS, cada uma de uma cor</b>, e todas atiram SIMULTANEAMENTE padrões independentes: a <b style="color:#7fb8ff">azul</b> cospe leques mirando você, a <b style="color:#e6dac4">cinza</b> lança círculos que também miram, a <b style="color:#ffd94f">amarela</b> solta lentas que PARAM e mudam de direção, a <b style="color:#7fd46f">verde</b> solta balas em direções aleatórias que depois DESCEN na diagonal e a <b style="color:#ff4f3d">vermelha</b> lança círculos que se CRUZAM — tudo ao mesmo tempo, orbitando o chefe. <b style="color:#d9465a">A CARD 6 REFEITA</b>: a CHUVA DO ÚLTIMO CÍRCULO agora alterna quatro formações — balas roxas grandes coladas deixando RASTROS VERMELHOS que se desviam em direções variadas, um círculo girando para a ESQUERDA, outro girando para a DIREITA, e a formação circular anterior se repetindo. <b style="color:#9d6bb5">O LIMBO FICA CINZA</b>: depois de duas fases a grama e o cenário perdem a cor, o nome da vira só <b>o limbo...?</b> — inimigos incomumente poucos e fracos, <b>como se alguém já tivesse passado</b>; perto do fim, uma <b style="color:#ffd9a0">ESTRANHA AURA DOURADA</b> vaza da porta do chefe — e chegando lá <b>não tem chefe: tem uma PLACA</b> (<i>aqui teria o primeiro pecado: ganancia, por preguiça e ainda uma junção de ideias, apenas tera isso, mas imagine uma luta fofda e ele no final rouba tudo seu</i>). Lida a placa, abre-se <b style="color:#ff6ad5">um BURACO com aura rosa — luxuria</b> — e entrando nele: <b>fim dos circulos por um momento</b>, com continue para o MODO INFINITO ou volta ao menu. <b style="color:#cfe9ff">O REMAKE FICOU MAIS DENSO</b>: vida um pouco maior (2500 + ameaça×130) e <b>nenhuma spell card se repete</b> — apareceu uma vez na barra, ela dá lugar ao fôlego (tiros base modestos) até a barra quebrar. E os ajustes finos: <b style="color:#fffdf4">o ponto VERMELHO da hitbox ficou BEM VISÍVEL</b> segurando SHIFT; a sentença nasce <b>no meio, um pouco pra cima</b> (sobra arena embaixo pra dançar); <b>o mouse atira COMO AS TECLAS</b> (segurar = segurar seta); <b style="color:#ffd9a0">a música do MENU cala quando o jogo começa</b> — o mapa ganhou tema próprio — e <b>cada área tem faixa agora</b> (portão, vulcão, corredor azul, limbo e o limbo...? — colocou o .ogg com o nome, toca o seu áudio).</div>'+'<div style="color:#e6dac4;font-size:13px;margin:10px 0">52. v1.6.0 — O ANEL QUE ACELERA</div>'+'<div style="margin-left:14px;margin-bottom:10px">Sete ajustes pedidos depois do teste. <b style="color:#cfe9ff">O PORTÃO NÃO FECHA MAIS</b> quando o Thor entra na arena do Cérbero — o vão fica aberto atrás dele, sem estrondo e sem o "não há mais volta". <b style="color:#ff2e55">O FRENESI DO GUARDIÃO SAIU</b>: na última cabeça o antigo não investe mais — ele cospe <b>UM CÍRCULO DE TIROS cuja cadência sobe A CADA SEGUNDO</b> (o intervalo encolhe sem parar até o piso de .45s), um cerco que só aperta. <b style="color:#ff8f3d">O REMAKE ATIRA SEM PARAR</b>: cooldown de TODOS os tiros menor (salvas até 20% mais juntas e mais rápidas em toda a tabela de dificuldade), mais balas nos anéis (+12%), o ritual das cards caiu para .35s e o respiro entre elas tem <b>TETO DURO de 1s</b> — nunca passa de ~1,4s parado, bem longe dos 2s. <b style="color:#d9465a">AS SPELL CARDS 6 E 8 FICARAM MAIS DIFÍCEIS</b>: a CHUVA DO ÚLTIMO CÍRCULO e o VERMELHO ABSOLUTO agora puxam um fator próprio (salvas 18% mais juntas, tiros 18% mais rápidos — e o vermelho com +22% de balas). <b style="color:#7fb8ff">O CORREDOR VOLTOU</b>: o barco do Caronte atraca e o Thor desce num corredor escuro que ele <b>atravessa como quem passa por uma porta</b> — sem portal nenhum — até o LIMBO se revelar no fim. E dois consertos: <b style="color:#cfe9ff">a barra de vida do Cérbero NUNCA MAIS aparece no Limbo</b> (ela morria velha no estado e renascia lá) e <b style="color:#cfe9ff">o corredor que é a entrada do Limbo aparecia não</b> — o barco pulava ele desde a v1.3.0; agora é a entrada oficial de novo.</div>'+'<div style="color:#e6dac4;font-size:13px;margin:10px 0">51. v1.5.9 — O ATALHO DE VOLTA</div>'+'<div style="margin-left:14px;margin-bottom:10px">Correção de rota, pedida por você. <b style="color:#c9a0ff">O botão PORTÃO DO CÉRBERUS · TESTE está DE VOLTA no menu</b> — a remoção da v1.5.8 foi longe demais: você vai testar a luta do Cérbero agora, e o atalho continua sendo o caminho mais rápido (escolha a arma e caia direto no caminho do portão, sem descer andar nenhum). <b style="color:#cfe9ff">Os sprites de teste CONTINUAM FORA</b> — a pasta COLOQUE SPRITES AQUI segue limpa para a SUA arte, e o jogo segue desenhando a <b style="color:#ffd9a0">ARTE VETORIAL original</b> em todo mundo. <b style="color:#9c8f7c">NADA mecânico mudou</b>: a cutscene da fera dormindo, o texto lento, a apresentação em IM Fell English SC, o pó, a mensagem vermelha, o remake com a vida se regenerando e os dois temas do Cérbero seguem exatamente como estavam.</div>'+'<div style="color:#e6dac4;font-size:13px;margin:10px 0">50. v1.5.8 — O PALCO ESTÁ PRONTO</div>'+'<div style="margin-left:14px;margin-bottom:10px">Os ensaios acabaram — o palco ficou limpo. <b style="color:#cfe9ff">OS SPRITES DE TESTE SAÍRAM</b>: as doze artes de teste que moravam na raiz da pasta assets/sprites (thor, cérbero, caronte, vigia, morcego, velho rei, feiticeiro, peão, sombra, piso, lamentadora e a cópia com espaço no nome) foram removidas — a pasta <b>COLOQUE SPRITES AQUI</b> está limpa para a SUA arte e o jogo volta a desenhar a <b style="color:#ffd9a0">ARTE VETORIAL original</b> em todo mundo (colou um PNG seu lá? ele entra sozinho, como sempre — e sem arquivo nada quebra, nunca fica invisível). E o <b style="color:#c9a0ff">botão temporário PORTÃO DO CÉRBERUS · TESTE saiu do menu</b> — o portão está aprovado, e o caminho até ele volta a ser <b>a descida de verdade</b>. <b style="color:#9c8f7c">NADA mecânico mudou</b>: a cutscene da fera dormindo, o texto lento, a apresentação em IM Fell English SC, o pó, a mensagem vermelha, o remake com a vida se regenerando e os dois temas do Cérbero seguem exatamente como estavam.</div>'+'<div style="color:#e6dac4;font-size:13px;margin:10px 0">49. v1.5.7 — O GUARDIÃO DA PASSAGEM</div>'+'<div style="margin-left:14px;margin-bottom:10px">O encontro com o guardião ganhou CERIMÔNIA. <b style="color:#cfe9ff">O THOR AGORA SAI DO PORTÃO POR BAIXO</b> — o vão fica no CHÃO da arena, ele emerge SUBINDO e fica lá embaixo, e o <b style="color:#fffdf4">CÉRBERO fica NA FRENTE dele</b> — o encontro é de frente, olho a olho. O <b style="color:#9c8f7c">texto antigo ficou MAIS LENTO</b> (letra por letra, sem pressa) e a fera acorda AINDA MAIS DEVAGAR — cada cabeça ergue no seu tempo. E a luta abre com <b style="color:#ffd9a0">A APRESENTAÇÃO DO BOSS</b>, na fonte de pergaminho <b>IM Fell English SC</b>: <b style="color:#cfe9ff">a tela escurece rápido</b>, <b>o som ambiente fica abafado</b>, a inscrição pequena <i>O GUARDIÃO DA PASSAGEM</i> surge primeiro — aí <b style="color:#fffdf4">CERBERUS irrompe no centro</b> com impacto sonoro grave, breve expansão de luz e ele RUGINDO; a <b style="color:#ff2e55">linha carmesim</b> desenha-se e revela o epíteto <i>O CÃO DAS TRÊS SENTENÇAS</i> — e o nome <b>desaparece LENTO quando o chefe começa a se mover</b>. <b style="color:#d9465a">NO REMAKE, A MESMA CERIMÔNIA</b>: o cenário escurece BEM SUTILMENTE até a transformação completar, a criatura emite LUZ BRANCA, e a segunda apresentação entra quando ele se transforma — <i>CERBERUS · O CÃO NEGRO DO JUÍZO CARMESIM</i> — o momento em que a luta muda de escala. E a pasta de músicas ganhou os DOIS temas: <b style="color:#ffd9a0">guardião do inferno</b> (Cérbero 1) e <b style="color:#ffd9a0">juiz da sentença negra</b> (Cérbero 2) em assets/audio/music — colocou o arquivo, ele toca; sem arquivo, os temas sintetizados embutidos seguem.</div>'+'<div style="color:#e6dac4;font-size:13px;margin:10px 0">48. v1.5.6 — A FERA DORME</div>'+'<div style="margin-left:14px;margin-bottom:10px">A cutscene antiga do Cérbero finalmente existe de verdade. <b style="color:#fffdf4">O SPRITE ANTIGO DO CÉRBERO — o de verdade, corpo, pernas, cauda e as três cabeças — DORME no fundo da arena</b>: olhos fechados, cabeças recolhidas, roncando, enquanto o Thor desce do vão sozinho e o portão se fecha atrás dele. E ele vai <b style="color:#cfe9ff">ACORDANDO LENTO</b> — cada cabeça ergue no seu tempo, os olhos abrindo devagar — enquanto o texto antigo aparece na tela, letra por letra: <i>“Cérbero, fera cruel e disforme, late como um cão com suas três goelas.”</i> <b style="color:#ffd9a0">Quando o texto acaba, o TÍTULO ÚNICO DO BOSS entra e a luta começa</b>. E a morte do antigo mudou: <b style="color:#9c8f7c">ele APENAS VIRA PÓ — sem nada</b>; o corpo fica na cena se desfazendo em pó cinza, sem cura na hora, sem aviso, sem música. <b style="color:#ff2e55">Poucos segundos depois, a mensagem vermelha entra na tela: “oh cão, voce cometeu um grave erro”</b> — e aí sim a cutscene do REMAKE começa, com <b style="color:#ffd9a0">a vida de Thor se regenerando sozinha</b> enquanto o Cérbero novo desperta o diálogo — cheia antes do primeiro padrão da sentença.</div>'+'<div style="color:#e6dac4;font-size:13px;margin:10px 0">47. v1.5.5 — O PORTÃO DE FRENTE</div>'+'<div style="margin-left:14px;margin-bottom:10px">O portão virou a cara do vulcão. <b style="color:#ff8f3d">ELE ESTÁ DE FRENTE, NO ALTO</b> — embutido na FACE NORTE de basalto que ocupa o horizonte inteiro do Caminho do Portão: a laje vulcânica agora atravessa a tela de parede a parede e você SOBE até a moldura como quem vai entrar de verdade. E a abertura foi consertada: <b style="color:#d9465a">as folhas estavam deslizando para o centro — parecia que o portão se FECHAVA</b>; agora as bordas externas ficam presas e as folhas recuam para FORA, abrindo de verdade, com o selo carmesim se partindo no início. <b style="color:#fffdf4">O DENTRO do portão ficou TOTALMENTE BRANCO</b> — o vão revelado é preenchido por luz plena (a bainha amarelo-alaranjada e as chamas continuam ao redor), não mais uma fenda fina. E a entrada virou cena: <b style="color:#cfe9ff">aberto o portão, o Thor anda sozinho e ENTRA pelo vão</b> — o branco o engole — e <b style="color:#ff2e55">AO ENTRAR a cutscene antiga do Cérbero começa</b> (portão da arena, as três cabeças, o snap, a luta), exatamente antes do combate — nada de trocar isso. Na cutscene, o portão também abriu de verdade (mesma correção das folhas).</div>'+'<div style="color:#e6dac4;font-size:13px;margin:10px 0">46. v1.5.4 — A SEGUNDA DESCIDA</div>'+'<div style="margin-left:14px;margin-bottom:10px">O portão mudou de lugar e a descida mudou de fim. <b style="color:#ff8f3d">O PORTÃO agora fica NO MEIO da tela</b>, embutido num PAREDÃO de basalto que desce do céu ao chão e ocupa a metade direita — a laje vulcânica termina exatamente nele, sem vão nenhum. E a abertura virou um clarão: <b style="color:#fffdf4">no MEIO, um BRANCO BRILHANTE</b>; <b style="color:#ff8f3d">ao redor, chamas amarelo-alaranjadas</b> — faíscas brancas nascendo da fenda, línguas de fogo nas beiradas das folhas e a radiação inundando a tela. <b style="color:#ff2e55">A ARENA do Cérbero ficou com o MESMO VISUAL da PENUMBRA INFERNAL</b> — o chão ebranquecido queimando nas bordas, tremulando, com fogo fora do cenário — desde a cutscene antiga de entrada (ela segue EXATAMENTE como era: portão abrindo devagar, as três cabeças, o snap) até a luta e o fim. E o final da vitória trocou: <b style="color:#7fb8ff">NÃO existe mais portão do inferno no fim</b> — no lugar dele abre <b style="color:#7fb8ff">A SEGUNDA DESCIDA</b>, uma escada fria e grande que desce da arena direto para o <b>CORREDOR AZULADO</b>; atravessou, vem <b>CARONTE</b>, depois o LIMBO em 4 fases e o Juiz Sem Rosto. O segredo do corredor (O Thor que Não Desceu) acompanhou o portão para o centro da laje, e nenhuma escada de andar pode nascer no meio da luta.</div>'+'<div style="color:#e6dac4;font-size:13px;margin:10px 0">45. v1.5.3 — O PORTÃO RESPONDE</div>'+'<div style="margin-left:14px;margin-bottom:10px">O portão parou de enganar: <b style="color:#ff8f3d">A CAUSA era um visitante invisível</b> — O THOR QUE NÃO DESCEU caía sobre o corredor sem nunca ser desenhado, e enquanto ele resistia o portão não respondia. Agora ele <b>aparece de verdade</b> (silhueta roxa + barra de vida), nasce no meio da laje e ganhou uma <b>válvula: fuja dele por 4 segundos (ou sobreviva 75s) e ele desiste e volta para a fila</b> — o portão fica SEMPRE alcançável. E o cenário parou de engolir o Thor: <b style="color:#d9465a">O CAMINHO DO PORTÃO ganhou uma LAJE DE PEDRA de verdade</b> — juntas de lajes, borda acesa pela lava, paredes de basalto dos dois lados e um limite duro: <b>o chão TERMINA antes do portão</b>; não existe mais andar por cima das colunas nem atravessar a moldura. De quebra, um <b style="color:#c9a0ff">BOTÃO DE TESTE no menu (PORTÃO DO CÉRBERUS · TESTE)</b> — escolha a arma e caia direto no corredor para conferir o [Z] sem descer andar nenhum (temporário — sai quando aprovado).</div>'+'<div style="color:#e6dac4;font-size:13px;margin:10px 0">44. v1.5.2 — O PORTÃO QUE ESPERA UMA MÃO</div>'+'<div style="margin-left:14px;margin-bottom:10px">A ida ao Cérbero virou lugar de verdade. <b style="color:#ff8f3d">O CAMINHO DO PORTÃO virou um MINI MAPA VULCÂNICO</b>: chão de pedra marrom-escura sob um céu vermelho vivo, fissuras de lava respirando, poças incandescentes, colunas de basalto e brasas subindo — e no fim dele, <b style="color:#d9465a">O PORTÃO ENORME</b>: nada de abrir sozinho — <b>chegue perto e aperte [Z]</b> (ou o botão de interação do toque) e as duas folhas de pedra se abrem devagar para a arena do Cérbero. Encostou sem apertar por 10 segundos? O calor o vence e ele cede — <b>ninguém fica preso</b>. <b style="color:#ff2e55">VENCEU O ANTIGO? A SENTENÇA ASSUME NA HORA</b> — derrubou as três cabeças do guardião e a forma remasterizada desperta de imediato, agora com aviso claro (<i>O GUARDIÃO TOMBOU — a sentença desperta das três bocas</i>). E as <b style="color:#cfe9ff">PORTAS deixaram de ser portas</b>: em toda a descida elas são apenas <b>passagens da cor do chão</b> — o vão pintado com o próprio piso da sala (trancada, uma costura fina marca o bloqueio; aberta, uma luz discreta convida) — <b>só a escola mantém as portas dela</b>, como sempre foi.</div>'+'<div style="color:#e6dac4;font-size:13px;margin:10px 0">43. v1.5.1 — AS PORTAS SE ABREM</div>'+
+'<div style="color:#ffd9a0;font-size:13px;margin:10px 0">64. v1.9.2 — A INTRODUÇÃO CINEMATOGRÁFICA</div>'+'<div style="margin-left:14px;margin-bottom:10px">A história proibida que se torna real: depois da abertura do livro, a câmera <b style="color:#ffd9a0">mergulha no manuscrito</b> — a prancha do grande abismo, o Inferno registrado em camadas (muralhas, portas fechadas, silhuetas atravessando caminhos, fumaça), frases nas margens ("Toda queda tem um começo." / "Nem toda alma chega ao fim de sua jornada."), e a região quase vazia onde <b style="color:#9fc0c9">Thor — o cachorro morto-vivo — acorda com peso</b>: ergue a cabeça, olha os próprios membros, silêncio, e caminha para a passagem ao fundo. A câmera volta ao livro (a ilustração mudou; a anotação registra: <i>"O corpo foi perdido. A vontade permaneceu."</i>), uma <b style="color:#ffd9a0">marca de tinta aparece na margem sozinha</b> ("ele acordou.") e o desenho vira o mundo: o papel some, os traços ganham volume e a paleta fria da Penumbra assume. O THOR REVENGE revela-se sobre o corredor final e o INICIAR vem abaixo — a mesma porta de sempre, agora com cinema. <b style="color:#cfe9ff">~45s na primeira apresentação, PULÁVEL</b> (clique/tecla/roda, dica discreta no canto), não repete automaticamente (o convite "rever a introdução" fica na ENTRADA), respeita ANIMAÇÕES DO LIVRO=DESLIGADAS e prefers-reduced-motion, respeita os volumes de música/efeitos, dorme com a aba oculta e <b>morre no fim: zero loops, zero canvas, zero áudio sobrando</b>. Zero mudança em gameplay, saves, lousa e handlers.</div>'+
+'<div style="color:#ffd9a0;font-size:13px;margin:10px 0">63. v1.9.1 — O LIVRO VIVO · A LOUSA</div>'+'<div style="margin-left:14px;margin-bottom:10px"><b style="color:#ffd9a0">O LIVRO ACORDOU</b>: o menu é um manuscrito físico sobre uma mesa de carvalho, à luz de duas velas — capa com lombada que abre com peso e o conteúdo <b style="color:#cfe9ff">JÁ ESCRITO</b> quando as páginas aparecem (clique para pular; da 2ª visita em diante a abertura fica curta). <b style="color:#cfe9ff">CADA OPÇÃO TEM CENA PRÓPRIA</b>: DESCER vira a página do mapa desenhado a tinta e a câmera entra nele; RETORNAR volta uma folha até o REGISTRO DAS ALMAS — os saves viram inscrições (carregar, renomear, queimar, restaurar cinza ali mesmo) com zoom da câmera na folha escolhida; OPÇÕES pousa a página "Das Marcas e Ajustes" com os controles escritos no papel; CÍRCULOS/ALMAS/INVENTÁRIO/GRIMÓRIO ganham folha rápida com pousada de câmera própria; MODS entra como folha solta; ABANDONAR fecha o livro devagar (e reabre com a despedida). <b style="color:#cfe9ff">ENGENHARIA</b>: câmera 3D por transform (GPU), folha com sombra e dobra, curvas de aceleração, UMA transição por vez — cliques durante a cena são ignorados e um watchdog devolve o controle (o menu NUNCA fica travado); teclado intacto (Tab + Enter atravessam o livro). <b style="color:#cfe9ff">DESEMPENHO</b>: mesa pintada UMA vez por resize, velas a 11 fps em canvases minúsculos, poeira limitada (16 motas, a cada 2 quadros), UM loop rAF para tudo que DORME quando o menu sai da tela ou a aba é ocultada; nada de blur/filter caro por quadro. <b style="color:#cfe9ff">ANIMAÇÕES DO LIVRO</b>: nova opção (completas/leves/desligadas) nas OPÇÕES; a abertura respeita prefers-reduced-motion. <b style="color:#cfe9ff">O EDITOR DE MODS SAIU DO JOGO</b> (como decidido): a forja é o mod-studio.html, FORA da tela; dentro do jogo ficou só O GERENCIADOR (abrir studio, importar o JSON, ativar/desativar/exportar/excluir) — e o motor continua rodando os mods importados inteiro: balas, os 8 formatos, padrões, spell cards, máquinas de blocos, sprites e buff/nerf. O botão do menu agora se chama MODS · O GERENCIADOR. <b style="color:#ffd9a0">v1.9.1 — A CARTOGRAFIA DO INFERNO</b>: a cutscene do livro abre o jogo e o botão INICIAR (THOR REVENGE em cima, INICIAR logo abaixo) aparece DEPOIS dela — o mesmo clique/Enter que pula a abertura não aperta o INICIAR. CÍRCULOS fecha o livro e revela a LOUSA: "A DESCIDA — CARTOGRAFIA DO INFERNO" — os nove anéis a giz (I fora → IX no fundo) com número, nome e símbolo de cada região (o portal do Abismo, as fitas do Desejo, a boca da Fome, a moeda rachada, a rachadura da Fúria, o sarcófago, a arma partida, o labirinto, a chave quebrada), o caminho pontilhado da descida com setas à mão e o abismo lacrado no centro — e a PENUMBRA DAS ALMAS FORA dos círculos, à direita: contorno aberto, traço fino e frio, ligada por uma anotação lateral descontínua (nunca um décimo anel). Passar o giz mostra a inscrição no espaço reservado; clicar aproxima a região antes de entrar. Estados REAIS do save: risco de confirmação nas descidas feitas, selos nos caminhos lacrados, legenda manuscrita. Ao sair, o livro reabre sozinho. E o MENU FICOU MAIS LEVE: a sombra do livro virou poça estática (o drop-shadow que re-filtrava o livro INTEIRO a cada repaint saiu — viradas, hover e respiração do idle custam zero), metaTick saiu do loop de 60fps (unlocks a cada 2s), o REGISTRO DAS ALMAS e a PAUSA não desenham mais o mundo atrás (quadro estático no canvas), e o HUD escreve no DOM só quando o valor muda.</div>'+'<div style="color:#ffd9a0;font-size:13px;margin:10px 0">62. v1.9.0 — O GRIMÓRIO DAS CEM ALMAS</div>'+'<div style="margin-left:14px;margin-bottom:10px"><b style="color:#ffd9a0">CEM ALMAS NOVAS</b>: 34 bênçãos, 33 pactos e 33 armas — todas com efeito real, sem cópia disfarçada. <b style="color:#cfe9ff">FEIXES</b> (Feixe do Primeiro Pecado · Raio do Último Julgamento): raríssimos, dano por TICK a cada 5 quadros (temporizador acumulado, independente do FPS), o dano NUNCA acumula por permanecer no alvo, e cada alvo alinhado recebe independentemente — com 8 sinergias exclusivas de feixe. <b style="color:#cfe9ff">PACTOS MAIS DIFÍCEIS</b>: peso ×0.35 nas cartas, 15% no chão, fora do básico da feira, e o altar de sangue agora cobra 30 de vida (+10 a cada uso na mesma sala). <b style="color:#cfe9ff">INIMIGOS APLICAM EFEITOS</b>: balas de fogo queimam, verdes envenenam, gélidas congelam (como sempre) — e contato com faíscas/morcegos queima, corrupções e almas envenenam. Nenhum efeito mata sozinho: para em 1 de vida. <b style="color:#cfe9ff">IA MAIS ESPERTA</b>: cuspedores/feiticeiros/vigias antecipam sua posição (com erro humano), perseguidores tentam fechar os seus lados, sh/cr/crs mais lentos, e a Coisa de Cervo agora corre a 255 (você corre 285) — o terror é a caça, não a velocidade. <b style="color:#cfe9ff">ZERO DRENAGEM</b>: auditoria completa — Pacto da Fome (5 HP/s), Fome Insciável (5 HP/10s), Coração Falso (10 HP/sala), Açougueiro, Falso Rei, Barqueiro, Dívida Infinita e Dívida de Sangue foram reescritos: agora cobram ALMAS, cadência ou dano recebido — nunca mais vida com o tempo. <b style="color:#cfe9ff">SINERGIAS REAIS</b>: registro central de 15 combinações entre itens novos (ativam e desativam sozinhas, descobertas ficam no grimório) + as 8 de feixe. <b style="color:#cfe9ff">MAGIKA</b>: cada descida sorteia um valor e 1-2 eventos estranhos (luz, mensagens, aparições, paleta, silêncio) — arquitetura pronta para novos eventos. <b style="color:#cfe9ff">O LIVRO</b>: menu renovado como um grimório antigo de duas páginas, com abertura animada (capa 3D, tinta que revela) — pulável com um clique, e nunca prende o menu. <b style="color:#cfe9ff">MOD STUDIO EXTERNO</b>: mod-studio.html abre FORA do jogo — cria balas, padrões, máquinas de blocos e testa na arena própria; exporta o JSON que o EDITOR DE MODS importa de volta. O estúdio interno continua intacto.</div>'+
+'<div style="color:#e6dac4;font-size:13px;margin:10px 0">61. v1.8.0 — A MÁQUINA DAS ALMAS</div>'+'<div style="margin-left:14px;margin-bottom:10px">O núcleo do <b style="color:#c9a0ff">CREATIVE MOD STUDIO</b> chegou — e é uma máquina. <b style="color:#cfe9ff">MÁQUINA DE BLOCOS (nova aba)</b>: o VISUAL LOGIC EDITOR — monte o ataque com blocos conectados SEM programar. DISPARAR PADRÃO (mira no jogador ou ângulo fixo, ×vezes com intervalo), ESPERAR, GIRAR FORMAÇÃO (graus + giro contínuo), VELOCIDADE DAS BALAS (×), COR DAS BALAS, DIVIDIR BALAS (cada bala vira N em leque, após Xs), ESPERAR VIDA DO CHEFE (o ataque pausa até o chefe chegar a X%), REPETIR SEQUÊNCIA (com CORPO aninhado), ALEATÓRIO ENTRE DOIS RAMOS, SIMULTÂNEO (os dois ramos ao mesmo tempo), USAR OUTRA MÁQUINA (a sequência salva vira bloco reutilizável entre projetos) e ENCERRAR ATAQUE. Cada bloco tem seus próprios campos — mexeu, salvou. <b style="color:#cfe9ff">LINHA DO TEMPO</b>: o ataque compilado no tempo, cada bloco na cor do tipo, total estimado — e o PONTEIRO corre numa faixa no pé da arena enquanto a máquina roda. <b style="color:#cfe9ff">NO JOGO REAL</b>: TORNAR A SPELL DO SENHOR — a máquina roda pelo mesmo trilho das spell cards (zero mudança no motor, arquivos originais intactos). <b style="color:#cfe9ff">SIMULADOR COM JOGADOR DE TESTE</b>: o Thor da área de testes ganhou PILOTO AUTOMÁTICO — PARADO, LATERAL (vai-e-volta), CIRCULAR, ROTA (clique pontos na arena e ele faz o circuito) e REPRODUZIR (grava o SEU movimento a 30 Hz e repete em laço — compare versões A/B do mesmo ataque). SIMULAR DANO −10% adianta os portões de vida. O mod CRIAÇÃO já vem com A MÁQUINA DE EXEMPLO: espiral → esperar → acelerar → girar → dividir → anel → encerrar.</div>'+
+'<div style="color:#e6dac4;font-size:13px;margin:10px 0">60. v1.7.3 — A FORJA DAS BALAS</div>'+'<div style="margin-left:14px;margin-bottom:10px">O modo CRIAR/EDITAR MEU PADRÃO da área de testes virou a <b style="color:#c9a0ff">FORJA DO PADRÃO</b> — criar os padrões dos inimigos AGORA É ALI. <b style="color:#cfe9ff">CRIAÇÃO COMPLETA</b>: tipo de formação (desenho — com MINI-TELA DE DESENHO dentro da própria área de testes, espiral, anel, estrela, onda), balas por vaga, velocidade, tamanho, rotação por vaga, INTERVALO entre vagas (a cadência das vagas é sua também) e cor — tudo editável AO VIVO enquanto a arena dispara, salvo no mod na hora. <b style="color:#cfe9ff">OS 8 FORMATOS DE BALA FUNCIONAM</b>: seletor FORMATO DA BALA (círculo, diamante, estrela, anel, seta, quadrado, cruz, oval) com GALERIA ao vivo mostrando os 8 com a cor/tamanho do padrão — o formato viaja com a bala e vale no sim, nos previews e NO JOGO REAL (gancho novo nas balas do motor). <b style="color:#cfe9ff">BALA PERSONALIZADA</b>: o padrão pode nascer com uma bala SUA da aba BALAS — o estilo completo (forma, tamanho, cor, transparência, brilho, rastro, rotação) é aplicado na hora na arena, nos previews e no jogo com o mod ativo. <b style="color:#cfe9ff">USAR NOS INIMIGOS</b>: escolha o senhor + o padrão nativo dele e SUBSTITUA pelo padrão da forja (vira o ataque real dele com o mod ativo), ou TORNE-O A SPELL CARD do senhor (todos os ataques viram ele) — com REMOVER dos dois e um painel mostrando tudo que o seu mod já substituiu/vinculou. <b style="color:#cfe9ff">DUPLICAR ESTE</b>: copie qualquer padrão para mexer sem perder o original — na forja e no editor de padrões, que também ganhou intervalo, formato e bala personalizada.</div>'+
+'<div style="color:#e6dac4;font-size:13px;margin:10px 0">59. v1.7.2 — A OFICINA VIVA</div>'+'<div style="margin-left:14px;margin-bottom:10px">A área de testes do estúdio virou <b style="color:#c9a0ff">a sala do jogo de verdade</b>. <b style="color:#cfe9ff">SALA REAL PARA TUDO</b>: a arena clássica 660×400 se aposentou — os três modos (TESTAR MINHA SPELL, CRIAR/EDITAR MEU PADRÃO e SIMULAR PADRÃO REAL) rodam na MESMA escala da sala, com as mesmas paredes e o mesmo Thor (240 px/s, 120 no foco); testar longe do jogo enganava. <b style="color:#cfe9ff">CRIAR/EDITAR MEU PADRÃO AO VIVO</b>: um novo modo onde o boneco dispara um padrão SEU sem parar — mexa em balas por vaga, velocidade, tamanho, rotação e cor DURANTE o teste (a próxima vaga já nasce com o novo valor e já fica salvo no mod), com <b>+ NOVO PADRÃO</b> para criar ali mesmo e <b>ABRIR NO EDITOR DE PADRÕES</b> para o desenho à mão. <b style="color:#cfe9ff">BUFF / NERF nos padrões do jogo</b>: no modo chefe real, dois sliders (VELOCIDADE das balas ×0.4-2.5 e CADÊNCIA de re-ataque ×0.4-2) mudam SÓ o padrão escolhido daquele senhor — o efeito aparece na hora no sim e fica salvo no mod (data.tuning), valendo na luta real quando o mod está ATIVADO (botão ATIVAR ESTE MOD ali mesmo; REMOVER AJUSTE desfaz). <b style="color:#cfe9ff">COMO FICA NO JOGO (sprites)</b>: o editor de sprites ganhou a pré-visualização na caixa REAL que o motor usa para cada slot (Thor 52×58, inimigos r×3, senhores r×3-3.4, o piso esticado na sala) — SOBREPOSTO NO JOGO (original a X% por baixo do seu) ou LADO A LADO NO JOGO, e o botão <b>SALVAR E VER NO JOGO</b> salva, ativa o mod e fecha o editor para você ver o sprite na luta. <b style="color:#cfe9ff">AVANÇO TRIPLO CORRIGIDO</b>: o Carrasco agora avança EM DIREÇÃO AO JOGADOR nas três investidas (cada uma mira onde o Thor está, com a rota carmesim no chão) e, na terceira, QUANDO CHEGA PERTO, desfere o golpe da pá ali mesmo — anel de aviso 132px, 0.5s para sair; se você despistar, o golpe sai na parede do mesmo jeito.</div>'+
+'<div style="color:#e6dac4;font-size:13px;margin:10px 0">58. v1.7.1 — O ENSAIO DOS SENHORES</div>'+'<div style="margin-left:14px;margin-bottom:10px">O ESTÚDIO DAS ALMAS agora <b style="color:#c9a0ff">mostra tudo que ele promete</b>. <b style="color:#cfe9ff">PRÉ-VISUALIZAÇÕES CONSERTADAS</b>: as previews de balas e padrões morriam ao abrir o jogo — agora andam de verdade: a bala voa pelo caminho com o estilo ATUAL dos campos (sem precisar salvar) e ao lado a <b>GALERIA DOS 8 FORMATOS</b> (círculo, diamante, estrela, anel, seta, quadrado, cruz, oval) redesenha na hora a cada ajuste de cor/tamanho/brilho. <b style="color:#cfe9ff">NOVA ABA — PADRÕES DOS BOSSES</b>: o catálogo REAL dos padrões dos 4 senhores (Bruxo, Carrasco, Viúva, Golem — clássicos, exclusivos kaizo e as SPELL CARDS assinatura) com a descrição de <b>como cada um funciona</b>, o botão <b>SIMULAR NA ÁREA DE TESTES</b> (com Fase II ligável) e a <b>SUBSTITUIÇÃO</b>: escolha um padrão SEU para entrar no lugar de qualquer padrão nativo quando o chefe sortear ele. <b style="color:#cfe9ff">SPELL CARDS DO JOGO</b>: a aba de spell cards agora lista os feitiços reais (Grimório Rasgado, Investida Ricochete, Avanço Triplo, Enxame Vampiro, Fios da Morte, Maré de Magma) com <b>VER AO VIVO</b> — e o modo de uso virou escolha: <b>FAZER PARA O BOSS</b> (substitui TODOS os ataques) ou <b>SUBSTITUIR UM padrão específico</b> dele (o resto do moveset continua). <b style="color:#cfe9ff">ÁREA DE TESTES COM CHEFE REAL</b>: além de testar a sua spell contra o Thor, o estúdio agora SIMULA o padrão real de qualquer senhor com a <b>IA verdadeira do jogo</b> — telegráfos, minas, fios da morte, maré de magma, cura do morcego, Fase II — e nada disso toca a run real (a simulação troca os cenários do motor num try/finally e devolve tudo). No console: __MODS.simBoss(&quot;gz&quot;,&quot;kz_magma&quot;) pula direto para a simulação.</div>'+
+'<div style="color:#e6dac4;font-size:13px;margin:10px 0">57. v1.7.0 — O ESTÚDIO DAS ALMAS</div>'+'<div style="margin-left:14px;margin-bottom:10px">O jogo virou PLATAFORMA DE CRIAÇÃO — o <b style="color:#c9a0ff">EDITOR DE MODS</b> agora mora no menu principal, sem download nenhum e sem conhecimento de programação. <b style="color:#ffd9a0">GERENCIADOR</b>: crie quantos mods quiser, ative/desative quando quiser, exporte/importe como JSON (arquivo ou copiar/colar) — os arquivos originais do jogo NUNCA são sobrescritos; o mod de criação <b>CRIAÇÃO</b> já vem instalado de brinde, com exemplos prontos. <b style="color:#cfe9ff">EDITOR DE BALAS</b>: escolha qualquer família de bala do jogo pela cor e mude forma (círculo, diamante, estrela, anel, seta, quadrado, cruz, oval), tamanho, cor, transparência, brilho, rastro, rotação e VELOCIDADE — com pré-visualização ao vivo; com o mod ATIVADO, as balas reais do jogo mudam na hora. <b style="color:#cfe9ff">EDITOR DE PADRÕES</b>: desenhe a formação COM O MOUSE (o traço vira balas) ou use espiral/anel/estrela/onda — quantidade, velocidade, rotação por vaga, tamanho e cor. <b style="color:#cfe9ff">EDITOR DE SPELL CARDS</b>: encadeie padrões em fases (atraso, intervalo, vezes, segura), dê nome, dono e dificuldade — e VINCLE a um senhor de mapa (Bruxo, Carrasco, Viúva ou Golem): com o mod ativo, o chefe lança a SUA spell card em vez dos padrões normais, com placa SPELL CARD. <b style="color:#cfe9ff">EDITOR DE SPRITES</b>: Thor, os quatro senhores, Cérbero, cabeças, Caronte, a Besta, o piso e mais — desenhe pixel a pixel (lápis, borracha, balde, conta-gotas, desfazer) com o sprite ORIGINAL como referência semitransparente (opacidade ajustável, lado a lado, dimensões e nome do arquivo à vista). <b style="color:#cfe9ff">ÁREA DE TESTES</b>: arena com Thor controlável (WASD/setas, SHIFT para o foco com a hitbox pequena) contra a sua spell card — pausar (P), passo a passo (.), reiniciar (R). <b style="color:#9c8f7c">O Editor de Mapas completo fica para uma versão futura</b> — o resto do estúdio já está de pé.</div>'+
+'<div style="color:#e6dac4;font-size:13px;margin:10px 0">56. v1.6.4 — A CORTE DUPLA</div>'+'<div style="margin-left:14px;margin-bottom:10px">A ENXURRADA CHEGOU AOS SENHORES DE MAPA — e o Carrasco da Penumbra aprendeu DOIS movesets novos, pedidos seus. <b style="color:#e8455a">O AVANÇO TRIPLO</b>: ele atravessa a arena, BATE NA PAREDE e a direção do PRÓXIMO avanço aparece no chão (linha carmesim tracejada) — e assim três vezes; na TERCEIRA investida ele usa <b>O ATAQUE DA PÁ</b>: um anel de aviso se abre ao redor dele e o golpe desce de perto (anel de estilhaços com brecha + a lâmina varrendo na direção que ele olha). Ler o chão é sobreviver — a rota de cada avanço é visível. <b style="color:#c25a7a">O ENXAME VAMPIRO</b>: ele solta morcegos de asas roxas que perseguem o Thor — e <b>CADA morcego que ACERTA CURA a vida do Carrasco</b> (o número verde em cima dele mostra a cura); os morcegos podem ser DERRUBADOS a tiro — abater o enxame é negar a cura. Na FASE II: duas vagas de morcegos e cura maior. <b style="color:#ff2450">A CORTE DUPLA</b>: <b>5% das salas de chefe acordam DOIS senhores de uma vez</b> — o gêmeo nasce com 80% da vida, e o aviso A CORTE DUPLA entra na tela. <b style="color:#ffd9a0">E OS PADRÕES KAIZO FICARAM MAIS RÁPIDOS E MAIS CHEIOS</b>: em sala kaizo <b>TODAS as balas voam 30% mais rápido</b> (a ENXURRADA), os padrões exclusivos e clássicos soltam MUITO mais projéteis (sigilos 9/6, leques 7/5, cometas 6/4 vagas, fileiras do Grimório 15, guilhotinas 9 lâminas × 4/3 colunas, estilhaços 18/13, anéis de 24-32, maré de 4 cristas e 14 vagas…), e todos os senhores re-atacam ~23% mais rápido no modo kaizo. As brechas continuam garantidas: nenhuma onda fecha todas as rotas de fuga.</div>'+
+'<div style="color:#e6dac4;font-size:13px;margin:10px 0">55. v1.6.3 — OS QUATRO FEITIÇOS</div>'+'<div style="margin-left:14px;margin-bottom:10px">Os quatro senhores de mapa ganharam o <b>SEU feitiço assinatura</b> — e a Fase II de cada um virou transformação mecânica de verdade. <b style="color:#c9a0ff">O BRUXO rasga o GRIMÓRIO</b>: linhas mágicas atravessam a arena, piscam em roxo e cospem FILEIRAS de projéteis — cada fileira tem uma brecha de duas vagas, então sempre existe rota segura; na <b>FASE II</b> o grimório faz LEITURA DUPLA: primeiro as linhas HORIZONTAIS, depois as DIAGONAIS, com aviso visual próprio (magenta claro, pisca mais rápido). <b style="color:#e8455a">O CARRASCO aprendeu a INVESTIDA RICOCHETE</b>: atravessa a arena, BATE na parede (zona de impacto + estilhaços com brecha) e prepara OUTRA investida num ângulo diferente — a direção de cada uma aparece NO CHÃO antes do movimento; na <b>FASE II</b> são TRÊS investidas em cadeia, com pausas curtas. <b style="color:#dfe7ee">A VIÚVA tece os FIOS DA MORTE</b>: fios finos nascem entre âncoras fixas, depois TENSIONAM e passam a CORTAR quem cruza o segmento; na <b>FASE II</b> eles ativam em sequência formando triângulo e diagonais, os já ativos continuam visíveis até acabar — e um lado da arena fica sempre aberto (nenhuma combinação fecha todas as rotas de fuga). <b style="color:#ff8f3d">O GOLEM solta a MARÉ DE MAGMA</b>: sinais luminosos verdes mostram a direção e as posições das zonas seguras ANTES de a onda atravessar a arena em três cristas; na <b>FASE II</b> uma SEGUNDA onda vem de outra direção DEPOIS que a primeira desaparece — e algumas zonas seguras mudam de lugar. Cada card entra com a placa SPELL CARD e domina o sorteio na Fase II. <b style="color:#ffd9a0">E um conserto de anos-luz</b>: o Carrasco, a Viúva e o Golem tinham feitiços exclusivos kaizo PRONTOS desde a v0.9.16 — mas NUNCA os lançavam (só o Bruxo sorteava os dele). Agora os quatro minibosses sorteiam os exclusivos, com a marca branca de aviso no chão.</div>'+'<div style="margin-left:14px;margin-bottom:10px"><b style="color:#9fd8ff">A LOJA DO ERRANTE acende a bênção selecionada</b>: na feira do chão, o nome da mercadoria mais próxima ganha uma PLACA clara com moldura azul e letras AZUL-ESCURAS, bem legíveis de ler (era um texto pequeno cor de pergaminho que sumia no chão); na loja aberta (Z), a carta sob o mouse/toque acende num fundo claro com o NOME em azul-escuro. <b style="color:#ffd9a0">NADA MAIS FICA EM CIMA DA PAREDE</b>: bênção, pacto, coração, almas, fagulha — se um drop nascer ou parar DENTRO da parede, ele desliza sozinho de volta ao chão jogável; se cair totalmente FORA do mapa, retorna ao MEIO da sala (conferido a cada quadro — nada fica perdido onde a mão não alcança). <b style="color:#d9465a">O PORTAL ESPERA A BÊNÇÃO</b>: derrotou o senhor de mapa e a bênção dele está no chão? O portal NÃO nasce — ele aparece no instante em que você a pega (na primeira vez, um aviso explica). E a <b style="color:#ffe9b8">COLHER COMICAMENTE GRANDE</b> ficou sem sermão de vez: a descrição agora diz só <i>é uma colher. comicamente grande.</i></div>'+'<div style="color:#e6dac4;font-size:13px;margin:10px 0">54. v1.6.2 — O CARROSSEL DAS ARMAS</div>'+'<div style="margin-left:14px;margin-bottom:10px">Três pedidos seus, todos dentro. <b style="color:#cfe9ff">A ESCOLHA DE ARMAS VIROU CARROSSEL</b> — em vez da parede de 8 cartas, agora é <b>UMA ARMA POR VEZ</b>: os botões <b style="color:#ffd9a0">◀ ▶ nas laterais</b> (ou as <b>SETAS ← → do teclado</b>) trocam de lado, a carta desliza devagarinho, e <b style="color:#fffdf4">ENTER ou ESPAÇO confirma a arma da frente</b>; os <b>pontos embaixo</b> pulam direto para qualquer arma (o NORMAL/HARD e o VOLTAR ficaram onde sempre estiveram). Funciona em todos os caminhos que abrem a escolha — descida de verdade, portão e teste do Limbo. <b style="color:#d9465a">E O LIMBO PAROU DE TRAVAR</b> — a causa era a <b>parede espelhada</b>: a varredura das bordas e os DOIS gradientes com recorte de CADA segmento rodavam <b>a cada quadro</b>, dezenas de vezes por segundo. Agora os trechos externos são <b>pré-calculados na construção da sala</b> (com corridas mescladas) e a parte estática — brilho leitoso, reflexo, rachaduras — fica pintada <b>numa camada em cache</b>: o quadro inteiro virou <b>1 cópia de imagem + traços baratos</b>. As rachaduras das paredes agora nascem fixas por sala (antes piscavam). <b style="color:#9c8f7c">A FASE CINZA DO LIMBO FICOU LISA</b> — no último véu (O LIMBO INFERNAL — FASE 2), o paraíso acaba de vez: o chão é <b>cinza liso, sem estrutura nenhuma</b> — sem grama, pedras, flores, rachaduras, <b>sem paredes espelhadas</b>, sem pólen dourado — e lá fora é o mesmo cinza, um tom abaixo: <b>sem céu, sem catedrais, sem árvores</b>. A única marca no piso é a borda de sempre, num traço cinza-escuro. O véu de fogo e as fissuras com brasa morreram nessa fase (seguem na fase anterior, que continua queimando). O teste rápido do menu (LIMBO · FASE FINAL · TESTE) cai direto nela.</div>'+'<div style="color:#e6dac4;font-size:13px;margin:10px 0">53. v1.6.1 — A BESTA TEM ROSTO</div>'+'<div style="margin-left:14px;margin-bottom:10px">Dois pedidos seus, dentro. <b style="color:#d9465a">A BESTA DA MORTE ACEITA A SUA ARTE</b>: coloque um PNG (ou JPG/WEBP/GIF) na pasta <b>assets/sprites/</b> com o nome <b>besta.png</b> (também vale <b>besta-das-trevas.png</b>, <b>fera.png</b>, <b>besta-do-abismo.png</b>… — a lista completa no COLOQUE-SPRITES-AQUI.txt) e, na tela de morte, a SUA besta entra no lugar da vetorial — chifres, cabeça, olhos em brasa e sorriso saem; o texto de provação e a assinatura <i>— A BESTA DO ABISMO —</i> continuam. Detecta sozinho, com o jogo rodando (re-escaneia a cada ~15s e a cada foco da janela), e sem o arquivo nada muda. <b style="color:#cfe9ff">E O JOGO INTEIRO AGORA SE ENCAIXA NA SUA RESOLUÇÃO</b> — 1080p, 1440p, 4K, notebook, celular — preenchendo a janela inteira <b>sem barra de rolagem</b>: a janela mudou (F11, girar o aparelho, arrastar a borda)? O jogo re-encaixa na hora, com um segundo passe atrasado para navegadores teimosos. De quebra: em janelas onde os menus não cabem, os painéis agora rolam POR DENTRO — nenhum botão fica cortado; em monitores que cabem tudo, nada muda.</div>'+'<div style="color:#e6dac4;font-size:13px;margin:10px 0">52. v1.6.0 — O CONSERTO DAS SALAS</div>'+'<div style="margin-left:14px;margin-bottom:10px">Um pacote de consertos pedidos por você, todos dentro das salas. <b style="color:#ffd9a0">SALAS SECRETAS</b>: <b style="color:#cfe9ff">TODA entrada agora tem 10% de revelar uma BÊNÇÃO ALEATÓRIA</b> — inclusive revisitas (se a visita já deixou uma bênção no chão, ela não duplica). E <b style="color:#d9465a">se o VELHO REI estiver esperando na sala secreta, A SALA SE FECHA</b> — as portas e a rachadura trancam atrás de você e <b>não existe volta até o rei cair</b> (a despedida dele reabre tudo, como sempre fez). <b style="color:#ff8f3d">PORTAS AGORA CEDEM À EXPLOSÃO</b>: a bomba (Porta das Sombras), o tiro explosivo (Pólvora) e a <b>FAGULHA [Q]</b> destroem portas trancadas <b>por inimigos</b> (combate/desafio varrido pela metade) ou <b>por enigma</b> (puzzle não resolvido) — a explosão abre a passagem e a porta destruída nasce aberta se você voltar. <b style="color:#cfe9ff">CHEFE, MINI-CHEFE e chefe secreto continuam sagrados</b> — essas trancas nenhuma bomba quebra. <b style="color:#bfd8e8">NADA MAIS DESAPARECE</b>: bênçãos, pactos (itens ativos), almas, vida e fagulhas no chão <b>não expiram mais pelo tempo</b> (a regra dos 11 segundos morreu) e <b>não somem mais ao sair da sala</b> — os itens ficam guardados na sala e voltam exatamente onde estavam quando você reentra. <b style="color:#e6dac4">A HITBOX DO THOR FICOU MENOR</b> — de 5px para <b>4px</b> (um tiro agora passa raspando onde antes acertava) — e o <b style="color:#ff2e55">ponto carmesim segue aparecendo SÓ com SHIFT segurado</b> (FOCO): soltou, some. No escolhidor de armas, <b>as descrições do O CREDOR e da COLHER COMICAMENTE GRANDE ficaram curtas</b> — o essencial, sem sermão. E de quebra: <b style="color:#c9a0ff">botão LIMBO · FASE FINAL · TESTE no menu</b> — escolha a arma e caia direto na fase 4 do Limbo (O LIMBO INFERNAL — FASE 2, andar 9) para conferir o fim da descida sem jogar do começo (temporário, igual ao botão do portão).</div>'+
+'<div style="color:#e6dac4;font-size:13px;margin:10px 0">51. v1.5.9 — O ATALHO DE VOLTA</div>'+'<div style="margin-left:14px;margin-bottom:10px">Correção de rota, pedida por você. <b style="color:#c9a0ff">O botão PORTÃO DO CÉRBERUS · TESTE está DE VOLTA no menu</b> — a remoção da v1.5.8 foi longe demais: você vai testar a luta do Cérbero agora, e o atalho continua sendo o caminho mais rápido (escolha a arma e caia direto no caminho do portão, sem descer andar nenhum). <b style="color:#cfe9ff">Os sprites de teste CONTINUAM FORA</b> — a pasta COLOQUE SPRITES AQUI segue limpa para a SUA arte, e o jogo segue desenhando a <b style="color:#ffd9a0">ARTE VETORIAL original</b> em todo mundo. <b style="color:#9c8f7c">NADA mecânico mudou</b>: a cutscene da fera dormindo, o texto lento, a apresentação em IM Fell English SC, o pó, a mensagem vermelha, o remake com a vida se regenerando e os dois temas do Cérbero seguem exatamente como estavam.</div>'+'<div style="color:#e6dac4;font-size:13px;margin:10px 0">50. v1.5.8 — O PALCO ESTÁ PRONTO</div>'+'<div style="margin-left:14px;margin-bottom:10px">Os ensaios acabaram — o palco ficou limpo. <b style="color:#cfe9ff">OS SPRITES DE TESTE SAÍRAM</b>: as doze artes de teste que moravam na raiz da pasta assets/sprites (thor, cérbero, caronte, vigia, morcego, velho rei, feiticeiro, peão, sombra, piso, lamentadora e a cópia com espaço no nome) foram removidas — a pasta <b>COLOQUE SPRITES AQUI</b> está limpa para a SUA arte e o jogo volta a desenhar a <b style="color:#ffd9a0">ARTE VETORIAL original</b> em todo mundo (colou um PNG seu lá? ele entra sozinho, como sempre — e sem arquivo nada quebra, nunca fica invisível). E o <b style="color:#c9a0ff">botão temporário PORTÃO DO CÉRBERUS · TESTE saiu do menu</b> — o portão está aprovado, e o caminho até ele volta a ser <b>a descida de verdade</b>. <b style="color:#9c8f7c">NADA mecânico mudou</b>: a cutscene da fera dormindo, o texto lento, a apresentação em IM Fell English SC, o pó, a mensagem vermelha, o remake com a vida se regenerando e os dois temas do Cérbero seguem exatamente como estavam.</div>'+'<div style="color:#e6dac4;font-size:13px;margin:10px 0">49. v1.5.7 — O GUARDIÃO DA PASSAGEM</div>'+'<div style="margin-left:14px;margin-bottom:10px">O encontro com o guardião ganhou CERIMÔNIA. <b style="color:#cfe9ff">O THOR AGORA SAI DO PORTÃO POR BAIXO</b> — o vão fica no CHÃO da arena, ele emerge SUBINDO e fica lá embaixo, e o <b style="color:#fffdf4">CÉRBERO fica NA FRENTE dele</b> — o encontro é de frente, olho a olho. O <b style="color:#9c8f7c">texto antigo ficou MAIS LENTO</b> (letra por letra, sem pressa) e a fera acorda AINDA MAIS DEVAGAR — cada cabeça ergue no seu tempo. E a luta abre com <b style="color:#ffd9a0">A APRESENTAÇÃO DO BOSS</b>, na fonte de pergaminho <b>IM Fell English SC</b>: <b style="color:#cfe9ff">a tela escurece rápido</b>, <b>o som ambiente fica abafado</b>, a inscrição pequena <i>O GUARDIÃO DA PASSAGEM</i> surge primeiro — aí <b style="color:#fffdf4">CERBERUS irrompe no centro</b> com impacto sonoro grave, breve expansão de luz e ele RUGINDO; a <b style="color:#ff2e55">linha carmesim</b> desenha-se e revela o epíteto <i>O CÃO DAS TRÊS SENTENÇAS</i> — e o nome <b>desaparece LENTO quando o chefe começa a se mover</b>. <b style="color:#d9465a">NO REMAKE, A MESMA CERIMÔNIA</b>: o cenário escurece BEM SUTILMENTE até a transformação completar, a criatura emite LUZ BRANCA, e a segunda apresentação entra quando ele se transforma — <i>CERBERUS · O CÃO NEGRO DO JUÍZO CARMESIM</i> — o momento em que a luta muda de escala. E a pasta de músicas ganhou os DOIS temas: <b style="color:#ffd9a0">guardião do inferno</b> (Cérbero 1) e <b style="color:#ffd9a0">juiz da sentença negra</b> (Cérbero 2) em assets/audio/music — colocou o arquivo, ele toca; sem arquivo, os temas sintetizados embutidos seguem.</div>'+'<div style="color:#e6dac4;font-size:13px;margin:10px 0">48. v1.5.6 — A FERA DORME</div>'+'<div style="margin-left:14px;margin-bottom:10px">A cutscene antiga do Cérbero finalmente existe de verdade. <b style="color:#fffdf4">O SPRITE ANTIGO DO CÉRBERO — o de verdade, corpo, pernas, cauda e as três cabeças — DORME no fundo da arena</b>: olhos fechados, cabeças recolhidas, roncando, enquanto o Thor desce do vão sozinho e o portão se fecha atrás dele. E ele vai <b style="color:#cfe9ff">ACORDANDO LENTO</b> — cada cabeça ergue no seu tempo, os olhos abrindo devagar — enquanto o texto antigo aparece na tela, letra por letra: <i>“Cérbero, fera cruel e disforme, late como um cão com suas três goelas.”</i> <b style="color:#ffd9a0">Quando o texto acaba, o TÍTULO ÚNICO DO BOSS entra e a luta começa</b>. E a morte do antigo mudou: <b style="color:#9c8f7c">ele APENAS VIRA PÓ — sem nada</b>; o corpo fica na cena se desfazendo em pó cinza, sem cura na hora, sem aviso, sem música. <b style="color:#ff2e55">Poucos segundos depois, a mensagem vermelha entra na tela: “oh cão, voce cometeu um grave erro”</b> — e aí sim a cutscene do REMAKE começa, com <b style="color:#ffd9a0">a vida de Thor se regenerando sozinha</b> enquanto o Cérbero novo desperta o diálogo — cheia antes do primeiro padrão da sentença.</div>'+'<div style="color:#e6dac4;font-size:13px;margin:10px 0">47. v1.5.5 — O PORTÃO DE FRENTE</div>'+'<div style="margin-left:14px;margin-bottom:10px">O portão virou a cara do vulcão. <b style="color:#ff8f3d">ELE ESTÁ DE FRENTE, NO ALTO</b> — embutido na FACE NORTE de basalto que ocupa o horizonte inteiro do Caminho do Portão: a laje vulcânica agora atravessa a tela de parede a parede e você SOBE até a moldura como quem vai entrar de verdade. E a abertura foi consertada: <b style="color:#d9465a">as folhas estavam deslizando para o centro — parecia que o portão se FECHAVA</b>; agora as bordas externas ficam presas e as folhas recuam para FORA, abrindo de verdade, com o selo carmesim se partindo no início. <b style="color:#fffdf4">O DENTRO do portão ficou TOTALMENTE BRANCO</b> — o vão revelado é preenchido por luz plena (a bainha amarelo-alaranjada e as chamas continuam ao redor), não mais uma fenda fina. E a entrada virou cena: <b style="color:#cfe9ff">aberto o portão, o Thor anda sozinho e ENTRA pelo vão</b> — o branco o engole — e <b style="color:#ff2e55">AO ENTRAR a cutscene antiga do Cérbero começa</b> (portão da arena, as três cabeças, o snap, a luta), exatamente antes do combate — nada de trocar isso. Na cutscene, o portão também abriu de verdade (mesma correção das folhas).</div>'+'<div style="color:#e6dac4;font-size:13px;margin:10px 0">46. v1.5.4 — A SEGUNDA DESCIDA</div>'+'<div style="margin-left:14px;margin-bottom:10px">O portão mudou de lugar e a descida mudou de fim. <b style="color:#ff8f3d">O PORTÃO agora fica NO MEIO da tela</b>, embutido num PAREDÃO de basalto que desce do céu ao chão e ocupa a metade direita — a laje vulcânica termina exatamente nele, sem vão nenhum. E a abertura virou um clarão: <b style="color:#fffdf4">no MEIO, um BRANCO BRILHANTE</b>; <b style="color:#ff8f3d">ao redor, chamas amarelo-alaranjadas</b> — faíscas brancas nascendo da fenda, línguas de fogo nas beiradas das folhas e a radiação inundando a tela. <b style="color:#ff2e55">A ARENA do Cérbero ficou com o MESMO VISUAL da PENUMBRA INFERNAL</b> — o chão ebranquecido queimando nas bordas, tremulando, com fogo fora do cenário — desde a cutscene antiga de entrada (ela segue EXATAMENTE como era: portão abrindo devagar, as três cabeças, o snap) até a luta e o fim. E o final da vitória trocou: <b style="color:#7fb8ff">NÃO existe mais portão do inferno no fim</b> — no lugar dele abre <b style="color:#7fb8ff">A SEGUNDA DESCIDA</b>, uma escada fria e grande que desce da arena direto para o <b>CORREDOR AZULADO</b>; atravessou, vem <b>CARONTE</b>, depois o LIMBO em 4 fases e o Juiz Sem Rosto. O segredo do corredor (O Thor que Não Desceu) acompanhou o portão para o centro da laje, e nenhuma escada de andar pode nascer no meio da luta.</div>'+'<div style="color:#e6dac4;font-size:13px;margin:10px 0">45. v1.5.3 — O PORTÃO RESPONDE</div>'+'<div style="margin-left:14px;margin-bottom:10px">O portão parou de enganar: <b style="color:#ff8f3d">A CAUSA era um visitante invisível</b> — O THOR QUE NÃO DESCEU caía sobre o corredor sem nunca ser desenhado, e enquanto ele resistia o portão não respondia. Agora ele <b>aparece de verdade</b> (silhueta roxa + barra de vida), nasce no meio da laje e ganhou uma <b>válvula: fuja dele por 4 segundos (ou sobreviva 75s) e ele desiste e volta para a fila</b> — o portão fica SEMPRE alcançável. E o cenário parou de engolir o Thor: <b style="color:#d9465a">O CAMINHO DO PORTÃO ganhou uma LAJE DE PEDRA de verdade</b> — juntas de lajes, borda acesa pela lava, paredes de basalto dos dois lados e um limite duro: <b>o chão TERMINA antes do portão</b>; não existe mais andar por cima das colunas nem atravessar a moldura. De quebra, um <b style="color:#c9a0ff">BOTÃO DE TESTE no menu (PORTÃO DO CÉRBERUS · TESTE)</b> — escolha a arma e caia direto no corredor para conferir o [Z] sem descer andar nenhum (temporário — sai quando aprovado).</div>'+'<div style="color:#e6dac4;font-size:13px;margin:10px 0">44. v1.5.2 — O PORTÃO QUE ESPERA UMA MÃO</div>'+'<div style="margin-left:14px;margin-bottom:10px">A ida ao Cérbero virou lugar de verdade. <b style="color:#ff8f3d">O CAMINHO DO PORTÃO virou um MINI MAPA VULCÂNICO</b>: chão de pedra marrom-escura sob um céu vermelho vivo, fissuras de lava respirando, poças incandescentes, colunas de basalto e brasas subindo — e no fim dele, <b style="color:#d9465a">O PORTÃO ENORME</b>: nada de abrir sozinho — <b>chegue perto e aperte [Z]</b> (ou o botão de interação do toque) e as duas folhas de pedra se abrem devagar para a arena do Cérbero. Encostou sem apertar por 10 segundos? O calor o vence e ele cede — <b>ninguém fica preso</b>. <b style="color:#ff2e55">VENCEU O ANTIGO? A SENTENÇA ASSUME NA HORA</b> — derrubou as três cabeças do guardião e a forma remasterizada desperta de imediato, agora com aviso claro (<i>O GUARDIÃO TOMBOU — a sentença desperta das três bocas</i>). E as <b style="color:#cfe9ff">PORTAS deixaram de ser portas</b>: em toda a descida elas são apenas <b>passagens da cor do chão</b> — o vão pintado com o próprio piso da sala (trancada, uma costura fina marca o bloqueio; aberta, uma luz discreta convida) — <b>só a escola mantém as portas dela</b>, como sempre foi.</div>'+'<div style="color:#e6dac4;font-size:13px;margin:10px 0">43. v1.5.1 — AS PORTAS SE ABREM</div>'+
 '<div style="margin-left:14px;margin-bottom:10px">A GRANDE DESTRAVA. <b style="color:#d9465a">A PORTA PARA O CÉRBERO NUNCA MAIS TRAVA</b>: a causa era a decoração nova — um arco/estátua grande podia nascer colado numa porta, e o raio de colisão dele (+ o corpo do Thor) empurrava você para longe do gatilho; como a sala re-sorteava as estruturas a cada entrada, a porta podia "fechar" do nada. Agora <b>progresso acima de decoração</b>: perto de portas abertas, da escada para o fundo e do portal, o raio das estruturas <b>encolhe sozinho</b> (e vira caminho livre se precisar) — e as composições novas já nascem com o dobro da folga das portas. <b style="color:#ffd9a0">A SALA NÃO MUDA MAIS</b>: a primeira composição de estruturas de cada sala fica <b>guardada</b> — saiu e voltou, tudo no mesmo lugar, no mesmo tamanho (a janela inclusive). <b style="color:#cfe9ff">O SELETOR DE DIFICULDADE virou uma escada</b>: <b>FÁCIL primeiro</b> e <b>KAIZO por último</b> (FÁCIL · NORMAL · HARD · PUNIÇÃO · ABISMO · PENITÊNCIA · KAIZO) — e no modo KAIZO <b>todos os bosses do mapa nascem kaizo de cara</b>, é a proposta do modo. <b style="color:#eef2f4">O BOSS QUE REPETE virou NEO</b>: nome <b>NEO —</b>, ataques <b>quase contínuos</b> (encadeia padrões com 55% de chance, aviso 40% mais curto, intervalo pela metade) e <b>tiros 30% mais rápidos</b> — rápido de ler, rápido de desviar. <b style="color:#ff2450">PENUMBRA INFERNAL legível</b>: as almas agora nascem em <b>vermelho/azul muito fortes</b> com brilho e contorno (o chão branco as engolia) e os tiros do Thor ganharam <b>halo escuro + borda de brasa</b>. E o <b style="color:#ff8f3d">MORCEGO FLAMEJANTE só caça a partir da Penumbra Infernal</b> (andar 3+).</div>'+
 '<div style="color:#e6dac4;font-size:13px;margin:10px 0">42. v1.5.0 — OS SALÕES DO DANMAKU</div>'+
 '<div style="margin-left:14px;margin-bottom:10px">O inferno foi reformado por dentro. <b style="color:#ffd9a0">SALAS MAIORES DE VERDADE</b> (~1,35× a largura, ~1,25× a altura — as arenas de chefe ~1,69× a área) com <b style="color:#cfe9ff">câmera que acompanha o Thor</b> pelos limites da sala — HUD, vinheta e efeitos de tela continuam fixos. <b style="color:#ffd9a0">TRANSIÇÃO DESLIZANTE</b>: atravessou a porta, a sala antiga sai deslizando e a nova entra pelo lado certo, já com <b>os inimigos NOS SEUS POSTOS</b> — nada de ondas surgindo do nada nas dificuldades novas. <b style="color:#ffe9b8">OS SALÕES FICARAM HABITADOS</b>: estruturas nascem de <b>composições predefinidas</b> (corredores de estátuas, ilhas de colunas, altares em ruínas…) com variações e anti-repetição — nada de espalhar objetos no dado. <b style="color:#eef2f4">APRESENTAÇÃO VS</b>: Thor encara o mini-chefe de um lado ao outro da tela antes da luta — só para quem NÃO tinha cena própria. <b style="color:#d9465a">O ANEL COM BRECHA ÚNICA se aposentou</b> no Normal e acima: a Viúva, o Golem, o Rei, o Erro 404, os Cavaleiros e as cabeças do Cérbero agora cospem <b>CÍRCULOS COMPLETOS</b> (rotativos, consecutivos, alternados) e <b>PADRÕES EM X</b> (duplos, combinados com círculo) — densidade e velocidade escalando até o Kaizo. <b style="color:#9d6bb5">O CREDOR aprendeu a balançar</b>: botão direito na PAREDE planta a âncora — pende da corda, balança e solta para voar com o impulso. <b style="color:#ff8f3d">NOVO MODO FÁCIL</b>: o combate de sempre, com os padrões antigos, as arenas antigas e o anel com a brecha de sempre — o perfil legado preservado. E a citação de Dante no menu só vira a página quando você entra no jogo de novo.</div>'+
@@ -19904,8 +20396,8 @@ if(game.menuIdle>=80){resetMenuIdle();}
 bind('menuLimboBtn','click',function(){audio();startLimboDirect();});
 /* v1.5.3: TESTE — botão temporário do portão no menu (v1.5.9: de volta) */
 bind('gateTestBtn','click',function(){audio();startGateDirect();});
-/* v1.6.5: TESTE — botão do limbo cinza no menu (a última fase, direto) */
-bind('limboTestBtn','click',function(){audio();startLimboTest();});
+/* v1.6.0: TESTE — botão temporário da última fase do Limbo no menu */
+bind('limboTestBtn','click',function(){audio();startLimboTestDirect();});
 bind('optBtn','click',function(){openOptions('menu');});
 bind('saveBtn','click',function(){audio();renderSaveCards();showOv('saves');game.state='saves';blurActive();});
 bind('saveBack','click',function(){hideOv('saves');game.state='menu';refreshMenuDev();blurActive();});
@@ -19938,7 +20430,7 @@ if(vb)vb.addEventListener('click',function(){audio();showOv('versionInfo');build
 const vbc=ov('versionInfoClose');
 if(vbc)vbc.addEventListener('click',function(){audio();hideOv('versionInfo');blurActive();});
 /* === seleção de arma === */
-bind('wBack','click',function(){audio();hideOv('weapons');showOv('menu');game.state='menu';game.limboPending=false;game.gatePending=false;refreshMenuDev();blurActive();});
+bind('wBack','click',function(){audio();hideOv('weapons');showOv('menu');game.state='menu';game.limboPending=false;game.gatePending=false;game.limboTestPending=false;refreshMenuDev();blurActive();});
 bind('deadMenuBtn','click',goToMenu);
 bind('optBtn2','click',function(){openOptions('pause');});
 bind('optBack','click',closeOptions);
@@ -19946,6 +20438,56 @@ bind('dNorm','click',function(){setDiff('normal');});
 bind('dHard','click',function(){setDiff('hard');});
 bind('wShot','click',function(){startGame('shot');});
 bind('wBite','click',function(){startGame('bite');});
+/* ===== v1.6.2: CARROSSEL DE ARMAS — uma arma por vez. As 8 cartas continuam
+   no DOM com os cliques de sempre (game.js e expansão intactos); o carrossel
+   só decide QUAL delas aparece. ◀ ▶ na tela, SETAS no teclado, pontos que
+   pulam direto, e a carta desliza de ladinho ao trocar. ===== */
+const WCAROUSEL=['wShot','wBite','w_sentenca','w_ultimopec','w_credor','w_colher','w_peixe','w_teclado'];
+let wCarIdx=0;
+function wCarApply(dir){
+  for(let i=0;i<WCAROUSEL.length;i++){
+    const el=ov(WCAROUSEL[i]);
+    if(el)el.classList.toggle('cur',i===wCarIdx);
+  }
+  const dots=ov('wDots');
+  if(dots&&!dots.dataset.built){
+    dots.dataset.built='1';
+    for(let i=0;i<WCAROUSEL.length;i++){
+      const d=document.createElement('button');
+      d.className='wDot';
+      const card=ov(WCAROUSEL[i]);
+      const h3=card?card.querySelector('h3'):null;
+      d.title=(h3?h3.textContent:WCAROUSEL[i])+' ('+(i+1)+'/'+WCAROUSEL.length+')';
+      (function(idx){d.addEventListener('click',function(){audio();wCarGo(idx,0);});})(i);
+      dots.appendChild(d);
+    }
+  }
+  if(dots){for(let i=0;i<dots.children.length;i++)dots.children[i].classList.toggle('cur',i===wCarIdx);}
+  if(dir){
+    const el=ov(WCAROUSEL[wCarIdx]);
+    if(el){
+      el.style.setProperty('--wdir',(dir>0?18:-18)+'px');
+      el.style.animation='none';void el.offsetWidth;el.style.animation='';
+    }
+  }
+}
+function wCarGo(i,dir){wCarIdx=(i+WCAROUSEL.length)%WCAROUSEL.length;wCarApply(dir);blip('sine',330+wCarIdx*24,410+wCarIdx*24,.06,.045);}
+function wCarMove(d){wCarGo(wCarIdx+d,d);}
+/* v1.6.2: o teclado (e os testes) falam com o carrossel por meio do window —
+   este bloco mora dentro de setupGame(), então as funções locais não são
+   visíveis fora dele; a ponte global mantém o handler do keydown (top-level)
+   funcionando. */
+window.wCarMove=wCarMove;
+window.wCarGo=wCarGo;
+window.wCarConfirm=function(){const _c=ov(WCAROUSEL[wCarIdx]);if(_c)_c.click();};
+window.wCarCur=function(){return WCAROUSEL[wCarIdx];};
+(function wCarBoot(){
+  const wo=ov('weapons');
+  if(wo&&!wo.classList.contains('carousel'))wo.classList.add('carousel');
+  wCarApply(0);
+})();
+bind('wPrev','click',function(){audio();wCarMove(-1);blurActive();});
+bind('wNext','click',function(){audio();wCarMove(1);blurActive();});
 bind('retryBtn','click',function(){audio();if(window.__EXPANSION_RETRY)window.__EXPANSION_RETRY();else openWeaponSelect();}); /* v1.3.0: revive na escola */
 bind('resumeBtn','click',togglePause);
 bind('restartBtn','click',openWeaponSelect);
